@@ -1,0 +1,37 @@
+按这套步骤做就可以，离线电脑不需要联网。
+
+先说明一个关键点：不要直接使用你从当前电脑复制过去的 .venv。虚拟环境带有机器相关路径，换电脑后很容易失效。最稳的是在离线电脑上重新创建一次 .venv，再用你已经带过去的 offline_packages 离线安装依赖。
+
+离线电脑使用步骤
+
+进入项目目录。
+cd 你的路径\VUE_PYTHON
+安装 Python 3.7.6。
+.\python-3.7.6-amd64.exe
+安装时建议勾选 Add Python to PATH。
+
+在项目目录重新创建虚拟环境。
+py -3.7 -m venv .venv
+如果 py 不可用，就用：
+
+python -m venv .venv
+用本地离线包安装依赖。
+.\.venv\Scripts\python.exe -m pip install --no-index --find-links=.\offline_packages -r requirements.txt
+启动项目。
+.\.venv\Scripts\python.exe app.py
+浏览器打开：
+http://127.0.0.1:5000
+你复制过去时要确保这些内容都在
+
+app.py
+dashboard_data.py
+requirements.txt
+offline_packages 文件夹
+OUT_OF_SPEC 文件夹
+static 和 templates 文件夹
+python-3.7.6-amd64.exe
+最常见的问题
+
+如果双击或直接用旧 .venv 报错：删掉项目里的 .venv，按上面的第 3 步重新建。
+如果 PowerShell 不让执行激活脚本，也没关系，直接用我上面写的 .\.venv\Scripts\python.exe ... 命令即可，不需要激活。
+如果启动后提示找不到数据，检查 OUT_OF_SPEC 文件夹有没有一起复制。
