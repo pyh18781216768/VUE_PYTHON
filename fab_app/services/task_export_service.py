@@ -43,6 +43,7 @@ def _export_excel(export_type: str, rows: list[dict]) -> tuple[BytesIO, str, str
             ("priority", "优先级"),
             ("assigneeUser", "负责人"),
             ("creatorUser", "创建人"),
+            ("startAt", "开始时间"),
             ("dueAt", "到期时间"),
             ("handoverRecordId", "关联交接记录"),
             ("description", "任务说明"),

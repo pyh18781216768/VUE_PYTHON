@@ -58,6 +58,7 @@ def ensure_task_tables() -> None:
                 description TEXT,
                 status TEXT NOT NULL,
                 priority TEXT NOT NULL,
+                start_at TEXT,
                 due_at TEXT,
                 assignee_user TEXT,
                 creator_user TEXT NOT NULL,
@@ -69,6 +70,7 @@ def ensure_task_tables() -> None:
             )
             """
         )
+        _ensure_column(connection, "TASK_ITEM", "start_at", "TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ATTACHMENT (
@@ -110,6 +112,14 @@ def fetch_all_shift_groups():
         ).fetchall()
 
 
+def fetch_shift_group(shift_group_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM SHIFT_GROUP WHERE id = ?",
+            (shift_group_id,),
+        ).fetchone()
+
+
 def insert_shift_group(payload: dict) -> int:
     with get_connection() as connection:
         cursor = connection.execute(
@@ -146,6 +156,12 @@ def update_shift_group(shift_group_id: int, payload: dict) -> None:
             f"UPDATE SHIFT_GROUP SET {assignments} WHERE id = :id",
             {"id": shift_group_id, **payload},
         )
+        connection.commit()
+
+
+def delete_shift_group(shift_group_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM SHIFT_GROUP WHERE id = ?", (shift_group_id,))
         connection.commit()
 
 
@@ -270,6 +286,7 @@ def insert_task(payload: dict) -> int:
                 description,
                 status,
                 priority,
+                start_at,
                 due_at,
                 assignee_user,
                 creator_user,
@@ -284,6 +301,7 @@ def insert_task(payload: dict) -> int:
                 :description,
                 :status,
                 :priority,
+                :start_at,
                 :due_at,
                 :assignee_user,
                 :creator_user,
@@ -298,6 +316,15 @@ def insert_task(payload: dict) -> int:
         )
         connection.commit()
         return int(cursor.lastrowid)
+
+
+def _ensure_column(connection, table_name: str, column_name: str, column_type: str) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
 def update_task(task_id: int, payload: dict) -> None:

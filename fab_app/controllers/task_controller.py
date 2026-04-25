@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, send_file
 from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.services.task_export_service import export_task_data
 from fab_app.services.task_system_service import (
+    delete_shift_group,
     get_attachment_file,
     get_reminders,
     get_report_summary,
@@ -20,7 +21,6 @@ from fab_app.services.task_system_service import (
     list_users,
     save_handover_record,
     save_shift_group,
-    save_system_settings,
     save_task,
     save_user,
 )
@@ -81,17 +81,20 @@ def save_task_shift():
     return jsonify({"item": item})
 
 
+@task_blueprint.delete("/api/task-system/shifts/<int:shift_group_id>")
+@admin_required
+def delete_task_shift(shift_group_id: int):
+    try:
+        delete_shift_group(shift_group_id)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "班次已删除。"})
+
+
 @task_blueprint.get("/api/task-system/settings")
 @login_required
 def task_settings():
     return jsonify(get_system_settings())
-
-
-@task_blueprint.post("/api/task-system/settings")
-@admin_required
-def save_task_settings():
-    payload = request.get_json(silent=True) or {}
-    return jsonify(save_system_settings(payload, current_username()))
 
 
 @task_blueprint.get("/api/task-system/handover-records")

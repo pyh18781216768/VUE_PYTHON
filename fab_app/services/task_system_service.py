@@ -76,8 +76,6 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
         "email": _normalize_text(payload.get("email")),
         "phone": _normalize_text(payload.get("phone")),
         "role": role,
-        "is_active": 1 if payload.get("isActive", True) else 0,
-        "shift_group_id": _safe_int(payload.get("shiftGroupId")),
         "updated_at": now,
     }
 
@@ -98,8 +96,8 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
                 "phone": user_payload["phone"],
                 "department": user_payload["department"],
                 "role": role,
-                "is_active": user_payload["is_active"],
-                "shift_group_id": user_payload["shift_group_id"],
+                "is_active": 1,
+                "shift_group_id": None,
                 "created_at": now,
                 "updated_at": now,
             }
@@ -139,6 +137,12 @@ def save_shift_group(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def delete_shift_group(shift_group_id: int) -> None:
+    if not task_repository.fetch_shift_group(shift_group_id):
+        raise ValueError("班次不存在")
+    task_repository.delete_shift_group(shift_group_id)
+
+
 def get_system_settings() -> dict[str, Any]:
     raw_settings = task_repository.fetch_setting_map()
     settings = {}
@@ -149,15 +153,6 @@ def get_system_settings() -> dict[str, Any]:
             continue
         settings[key] = _parse_setting_value(raw_value, default_value)
     return settings
-
-
-def save_system_settings(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
-    now = _now_text()
-    current_settings = get_system_settings()
-    for key in DEFAULT_SETTINGS:
-        value = payload.get(key, current_settings[key])
-        task_repository.upsert_setting(key, value, now, actor_username)
-    return get_system_settings()
 
 
 def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
@@ -289,16 +284,18 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
     if priority not in TASK_PRIORITIES:
         raise ValueError("任务优先级无效")
 
+    start_at = _normalize_datetime_text(payload.get("startAt"))
     due_at = _normalize_datetime_text(payload.get("dueAt"))
     task_payload = {
         "title": _normalize_text(payload.get("title")),
         "description": _normalize_text(payload.get("description")),
         "status": status,
         "priority": priority,
+        "start_at": start_at,
         "due_at": due_at,
         "assignee_user": _resolve_person_name(payload.get("assigneeUser")),
         "handover_record_id": _safe_int(payload.get("handoverRecordId")),
-        "reminder_at": _normalize_datetime_text(payload.get("reminderAt")),
+        "reminder_at": None,
         "updated_at": now,
         "completed_at": now if status == "已完成" else None,
     }
@@ -480,7 +477,6 @@ def _build_user_summary(row) -> dict[str, Any]:
         "email": _normalize_text(row["email"]),
         "phone": _normalize_text(row["phone"]),
         "role": _normalize_role(row["role"]),
-        "isActive": bool(row["is_active"] if row["is_active"] is not None else 1),
         "shiftGroupId": _safe_int(row["shift_group_id"]),
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
@@ -527,11 +523,11 @@ def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]
         "description": _normalize_text(row["description"]),
         "status": _normalize_text(row["status"]),
         "priority": _normalize_text(row["priority"]),
+        "startAt": _normalize_text(row["start_at"]),
         "dueAt": _normalize_text(row["due_at"]),
         "assigneeUser": _normalize_text(row["assignee_user"]),
         "creatorUser": _normalize_text(row["creator_user"]),
         "handoverRecordId": _safe_int(row["handover_record_id"]),
-        "reminderAt": _normalize_text(row["reminder_at"]),
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "completedAt": _normalize_text(row["completed_at"]),

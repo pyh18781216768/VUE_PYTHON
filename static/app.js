@@ -492,6 +492,8 @@
       const root = ref(null);
       const query = ref("");
       const open = ref(false);
+      const suppressNextFocusClear = ref(false);
+      const lastChosenLabel = ref("");
 
       const normalizedOptions = computed(() => {
         const items = props.options.map((item) => {
@@ -527,6 +529,8 @@
       function choose(option) {
         emit("update:modelValue", option.value);
         query.value = option.label;
+        lastChosenLabel.value = option.label;
+        suppressNextFocusClear.value = true;
         open.value = false;
       }
 
@@ -539,6 +543,12 @@
       }
 
       function handleFocus() {
+        if (suppressNextFocusClear.value) {
+          suppressNextFocusClear.value = false;
+          query.value = lastChosenLabel.value || selectedOption.value?.label || "";
+          open.value = false;
+          return;
+        }
         query.value = "";
         open.value = true;
       }
@@ -722,6 +732,14 @@
         status: "",
         assigneeUser: "",
       });
+      const userFilters = reactive({
+        keyword: "",
+        role: "",
+      });
+      const shiftFilters = reactive({
+        keyword: "",
+        isActive: "",
+      });
       const handoverForm = reactive({
         id: "",
         title: "",
@@ -740,10 +758,10 @@
         description: "",
         status: "未开始",
         priority: "中",
+        startAt: "",
         dueAt: "",
         assigneeUser: "",
         handoverRecordId: "",
-        reminderAt: "",
       });
       const userForm = reactive({
         username: "",
@@ -752,8 +770,6 @@
         email: "",
         phone: "",
         role: "user",
-        isActive: true,
-        shiftGroupId: "",
         password: "",
       });
       const shiftForm = reactive({
@@ -764,11 +780,6 @@
         sortOrder: 0,
         isActive: true,
       });
-      const settingsForm = reactive({
-        "notifications.handover_minutes": 30,
-        "notifications.task_due_hours": 24,
-        "permissions.assign_admin": true,
-      });
       const handoverFiles = ref([]);
       const taskFiles = ref([]);
       const taskActionSubmitting = ref(false);
@@ -777,6 +788,7 @@
       const handoverFormOpen = ref(false);
       const taskFormOpen = ref(false);
       const userFormOpen = ref(false);
+      const shiftFormOpen = ref(false);
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
       const isAdmin = computed(() => (authUser.value.role || "") === "admin");
@@ -864,6 +876,39 @@
               .join(" ")
               .toLowerCase();
             if (!haystack.includes(taskFilters.keyword.toLowerCase())) return false;
+          }
+          return true;
+        })
+      );
+      const filteredTaskUsers = computed(() =>
+        (taskSystem.value.users || []).filter((item) => {
+          if (userFilters.role && item.role !== userFilters.role) return false;
+          if (userFilters.keyword) {
+            const haystack = [
+              item.username,
+              item.displayName,
+              item.displayLabel,
+              item.department,
+              item.email,
+              item.phone,
+            ]
+              .join(" ")
+              .toLowerCase();
+            if (!haystack.includes(userFilters.keyword.toLowerCase())) return false;
+          }
+          return true;
+        })
+      );
+      const filteredShiftOptions = computed(() =>
+        shiftOptions.value.filter((item) => {
+          if (shiftFilters.isActive !== "" && String(item.isActive) !== String(shiftFilters.isActive)) {
+            return false;
+          }
+          if (shiftFilters.keyword) {
+            const haystack = [item.name, item.startTime, item.endTime, item.sortOrder]
+              .join(" ")
+              .toLowerCase();
+            if (!haystack.includes(shiftFilters.keyword.toLowerCase())) return false;
           }
           return true;
         })
@@ -1511,10 +1556,10 @@
         taskForm.description = "";
         taskForm.status = "未开始";
         taskForm.priority = "中";
+        taskForm.startAt = "";
         taskForm.dueAt = "";
         taskForm.assigneeUser = "";
         taskForm.handoverRecordId = "";
-        taskForm.reminderAt = "";
         taskFiles.value = [];
       }
 
@@ -1535,8 +1580,6 @@
         userForm.email = "";
         userForm.phone = "";
         userForm.role = "user";
-        userForm.isActive = true;
-        userForm.shiftGroupId = "";
         userForm.password = "";
       }
 
@@ -1563,13 +1606,14 @@
         shiftForm.isActive = true;
       }
 
-      function syncSettingsForm() {
-        settingsForm["notifications.handover_minutes"] =
-          taskSystem.value.settings["notifications.handover_minutes"] ?? 30;
-        settingsForm["notifications.task_due_hours"] =
-          taskSystem.value.settings["notifications.task_due_hours"] ?? 24;
-        settingsForm["permissions.assign_admin"] =
-          taskSystem.value.settings["permissions.assign_admin"] ?? true;
+      function openShiftForm() {
+        resetShiftForm();
+        shiftFormOpen.value = true;
+      }
+
+      function closeShiftForm() {
+        resetShiftForm();
+        shiftFormOpen.value = false;
       }
 
       function resetFilters() {
@@ -1847,10 +1891,10 @@
         taskForm.description = item.description;
         taskForm.status = item.status || "未开始";
         taskForm.priority = item.priority || "中";
+        taskForm.startAt = (item.startAt || "").replace(" ", "T").slice(0, 16);
         taskForm.dueAt = (item.dueAt || "").replace(" ", "T").slice(0, 16);
         taskForm.assigneeUser = item.assigneeUser;
         taskForm.handoverRecordId = String(item.handoverRecordId || "");
-        taskForm.reminderAt = (item.reminderAt || "").replace(" ", "T").slice(0, 16);
         taskFiles.value = [];
         taskSection.value = "tasks";
         taskFormOpen.value = true;
@@ -1863,21 +1907,9 @@
         userForm.email = item.email;
         userForm.phone = item.phone;
         userForm.role = item.role;
-        userForm.isActive = item.isActive;
-        userForm.shiftGroupId = String(item.shiftGroupId || "");
         userForm.password = "";
         taskSection.value = "users";
         userFormOpen.value = true;
-      }
-
-      function editShift(item) {
-        shiftForm.id = String(item.id);
-        shiftForm.name = item.name;
-        shiftForm.startTime = item.startTime;
-        shiftForm.endTime = item.endTime;
-        shiftForm.sortOrder = item.sortOrder;
-        shiftForm.isActive = item.isActive;
-        taskSection.value = "settings";
       }
 
       async function submitHandover() {
@@ -1948,10 +1980,7 @@
         try {
           const responsePayload = await requestJson("/api/task-system/users", {
             method: "POST",
-            body: JSON.stringify({
-              ...userForm,
-              shiftGroupId: userForm.shiftGroupId || null,
-            }),
+            body: JSON.stringify({ ...userForm }),
           });
           upsertTaskSystemItem("users", responsePayload.item);
           resetUserForm();
@@ -1969,19 +1998,22 @@
       }
 
       async function submitShift() {
+        if (!isTaskFormIdle()) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
         try {
-          await requestJson("/api/task-system/shifts", {
+          const responsePayload = await requestJson("/api/task-system/shifts", {
             method: "POST",
             body: JSON.stringify({
               ...shiftForm,
               id: shiftForm.id || null,
             }),
           });
-          await fetchTaskSystem();
+          upsertTaskSystemItem("shifts", responsePayload.item);
           resetShiftForm();
+          shiftFormOpen.value = false;
           setTaskActionMessage("班次设置已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -1992,16 +2024,19 @@
         }
       }
 
-      async function submitSettings() {
+      async function deleteShift(item) {
+        if (!isTaskFormIdle()) return;
+        const confirmed = window.confirm(`确认删除班次“${item.name}”？`);
+        if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
         try {
-          await requestJson("/api/task-system/settings", {
-            method: "POST",
-            body: JSON.stringify({ ...settingsForm }),
-          });
-          await fetchTaskSystem();
-          setTaskActionMessage("系统设置已保存。");
+          await requestJson(`/api/task-system/shifts/${item.id}`, { method: "DELETE" });
+          taskSystem.value.shifts = (taskSystem.value.shifts || []).filter(
+            (shift) => Number(shift.id) !== Number(item.id)
+          );
+          setTaskActionMessage("班次已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -2171,7 +2206,6 @@
         taskSystemError.value = "";
         try {
           taskSystem.value = await requestJson("/api/task-system/bootstrap");
-          syncSettingsForm();
           if (resetForms) {
             resetHandoverForm();
             resetTaskForm();
@@ -2883,11 +2917,12 @@
         chartSettings,
         handoverFilters,
         taskFilters,
+        userFilters,
+        shiftFilters,
         handoverForm,
         taskForm,
         userForm,
         shiftForm,
-        settingsForm,
         handoverFiles,
         taskFiles,
         taskActionSubmitting,
@@ -2896,6 +2931,9 @@
         handoverFormOpen,
         taskFormOpen,
         userFormOpen,
+        shiftFormOpen,
+        filteredTaskUsers,
+        filteredShiftOptions,
         pageConfig,
         currentRows,
         detailRows,
@@ -2978,18 +3016,19 @@
         editHandover,
         editTask,
         editUser,
-        editShift,
         openHandoverForm,
         closeHandoverForm,
         openTaskForm,
         closeTaskForm,
         openUserForm,
         closeUserForm,
+        openShiftForm,
+        closeShiftForm,
         submitHandover,
         submitTask,
         submitUser,
         submitShift,
-        submitSettings,
+        deleteShift,
         downloadTaskExport,
         resetHandoverForm,
         resetTaskForm,
