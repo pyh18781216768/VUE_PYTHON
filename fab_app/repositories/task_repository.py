@@ -48,6 +48,7 @@ def ensure_task_tables() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 shift_group_id INTEGER,
+                floor_id INTEGER,
                 record_time TEXT NOT NULL,
                 handover_user TEXT NOT NULL,
                 receiver_user TEXT NOT NULL,
@@ -61,6 +62,7 @@ def ensure_task_tables() -> None:
             )
             """
         )
+        _ensure_column(connection, "HANDOVER_RECORD", "floor_id", "INTEGER")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS TASK_ITEM (
@@ -275,6 +277,7 @@ def insert_handover_record(payload: dict) -> int:
             INSERT INTO HANDOVER_RECORD (
                 title,
                 shift_group_id,
+                floor_id,
                 record_time,
                 handover_user,
                 receiver_user,
@@ -289,6 +292,7 @@ def insert_handover_record(payload: dict) -> int:
             VALUES (
                 :title,
                 :shift_group_id,
+                :floor_id,
                 :record_time,
                 :handover_user,
                 :receiver_user,

@@ -54,11 +54,11 @@ def login():
     password = str(payload.get("password", ""))
 
     if not username or not password:
-        return jsonify({"message": "请输入登录名和密码。"}), 400
+        return jsonify({"message": "请输入工号和密码。"}), 400
 
     profile = authenticate_user(username, password)
     if not profile:
-        return jsonify({"message": "登录名或密码错误。"}), 401
+        return jsonify({"message": "工号或密码错误。"}), 401
 
     session.clear()
     session["username"] = profile["username"]
@@ -84,7 +84,7 @@ def save_profile():
     requested_username = str(payload.get("username", "")).strip()
 
     if requested_username and requested_username != current_username():
-        return jsonify({"message": "登录名不可修改。"}), 400
+        return jsonify({"message": "工号不可修改。"}), 400
 
     new_password = str(payload.get("newPassword", "") or "")
     confirm_password = str(payload.get("confirmPassword", "") or "")
@@ -102,6 +102,7 @@ def save_profile():
         {
             "display_name": payload.get("displayName", ""),
             "department": payload.get("department", ""),
+            "supervisor_user": payload.get("supervisorUser", ""),
             "email": payload.get("email", ""),
             "phone": payload.get("phone", ""),
         },

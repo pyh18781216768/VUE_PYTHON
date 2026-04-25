@@ -27,6 +27,20 @@ DEFAULT_SETTINGS = {
 TASK_STATUSES = ("未开始", "进行中", "已完成")
 TASK_PRIORITIES = ("低", "中", "高")
 UPLOAD_ROOT = BASE_DIR / "storage" / "uploads"
+ROLE_PERMISSION_LEVELS = {
+    "user": 1,
+    "line_leader": 5,
+    "section_chief": 5,
+    "department_head": 5,
+    "admin": 5,
+}
+ROLE_ALIASES = {
+    "普通用户": "user",
+    "线组长": "line_leader",
+    "科长": "section_chief",
+    "部长": "department_head",
+    "超级管理员": "admin",
+}
 
 
 def ensure_task_system_store() -> None:
@@ -67,7 +81,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     now = _now_text()
     username = _normalize_text(payload.get("username"))
     if not username:
-        raise ValueError("用户名不能为空")
+        raise ValueError("工号不能为空")
 
     existing = user_repository.fetch_user(username)
     role = _normalize_role(payload.get("role"))
@@ -76,6 +90,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
         "department": _normalize_text(payload.get("department")),
         "email": _normalize_text(payload.get("email")),
         "phone": _normalize_text(payload.get("phone")),
+        "supervisor_user": _normalize_text(payload.get("supervisorUser")),
         "role": role,
         "updated_at": now,
     }
@@ -96,6 +111,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
                 "email": user_payload["email"],
                 "phone": user_payload["phone"],
                 "department": user_payload["department"],
+                "supervisor_user": user_payload["supervisor_user"],
                 "role": role,
                 "is_active": 1,
                 "shift_group_id": None,
@@ -185,6 +201,7 @@ def get_system_settings() -> dict[str, Any]:
 
 def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
     shifts_by_id = {item["id"]: item for item in list_shift_groups()}
+    floors_by_id = {item["id"]: item for item in list_floors()}
     attachments_by_owner = _build_attachment_lookup("handover")
     records = []
     keyword = _normalize_text(filters.get("keyword")).lower()
@@ -195,7 +212,7 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
     receiver_user = _normalize_text(filters.get("receiverUser"))
 
     for row in task_repository.fetch_all_handover_records():
-        record = _build_handover_summary(row, shifts_by_id, attachments_by_owner)
+        record = _build_handover_summary(row, shifts_by_id, floors_by_id, attachments_by_owner)
         if date_from and record["recordTime"][:10] < date_from:
             continue
         if date_to and record["recordTime"][:10] > date_to:
@@ -211,8 +228,10 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     record["title"],
                     record["shiftName"],
+                    record["floorName"],
                     record["handoverUser"],
                     record["receiverUser"],
+                    record["receiverSupervisorLabel"],
                     record["workSummary"],
                     record["precautions"],
                     record["pendingItems"],
@@ -235,6 +254,7 @@ def save_handover_record(
     record_payload = {
         "title": _normalize_text(payload.get("title")) or "交接班记录",
         "shift_group_id": _safe_int(payload.get("shiftGroupId")),
+        "floor_id": _safe_int(payload.get("floorId")),
         "handover_user": _resolve_person_name(payload.get("handoverUser")) or actor_profile["displayLabel"],
         "receiver_user": _resolve_person_name(payload.get("receiverUser")),
         "work_summary": _normalize_text(payload.get("workSummary")),
@@ -245,6 +265,8 @@ def save_handover_record(
     }
     if not record_payload["receiver_user"]:
         raise ValueError("接班人不能为空")
+    if not record_payload["floor_id"]:
+        raise ValueError("楼层不能为空")
 
     record_id = _safe_int(payload.get("id"))
     if record_id:
@@ -272,6 +294,10 @@ def save_handover_record(
 
 def list_tasks(filters: dict[str, Any]) -> list[dict[str, Any]]:
     attachments_by_owner = _build_attachment_lookup("task")
+    handover_supervisors = {
+        item["id"]: item["receiverSupervisorLabel"]
+        for item in list_handover_records({})
+    }
     keyword = _normalize_text(filters.get("keyword")).lower()
     status = _normalize_text(filters.get("status"))
     assignee_user = _normalize_text(filters.get("assigneeUser"))
@@ -280,6 +306,7 @@ def list_tasks(filters: dict[str, Any]) -> list[dict[str, Any]]:
 
     for row in task_repository.fetch_all_tasks():
         task = _build_task_summary(row, attachments_by_owner)
+        task["supervisorLabel"] = handover_supervisors.get(task["handoverRecordId"], "")
         if status and task["status"] != status:
             continue
         if assignee_user and task["assigneeUser"] != assignee_user:
@@ -295,6 +322,7 @@ def list_tasks(filters: dict[str, Any]) -> list[dict[str, Any]]:
                     task["priority"],
                     task["assigneeUser"],
                     task["creatorUser"],
+                    task["supervisorLabel"],
                 ]
             ).lower()
             if keyword not in haystack:
@@ -496,6 +524,10 @@ def _build_attachment_lookup(owner_type: str) -> dict[int, list[dict[str, Any]]]
 
 
 def _build_user_summary(row) -> dict[str, Any]:
+    role = _normalize_role(row["role"])
+    supervisor_user = _normalize_text(row["supervisor_user"])
+    supervisor_row = user_repository.fetch_user(supervisor_user) if supervisor_user else None
+    supervisor_display_name = _normalize_text(supervisor_row["display_name"]) if supervisor_row else ""
     return {
         "id": row["rowid"],
         "username": _normalize_text(row["user"]),
@@ -504,7 +536,10 @@ def _build_user_summary(row) -> dict[str, Any]:
         "department": _normalize_text(row["department"]),
         "email": _normalize_text(row["email"]),
         "phone": _normalize_text(row["phone"]),
-        "role": _normalize_role(row["role"]),
+        "supervisorUser": supervisor_user,
+        "supervisorLabel": supervisor_display_name or supervisor_user,
+        "role": role,
+        "permissionLevel": ROLE_PERMISSION_LEVELS.get(role, 1),
         "shiftGroupId": _safe_int(row["shift_group_id"]),
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
@@ -532,17 +567,29 @@ def _build_floor_summary(row) -> dict[str, Any]:
     }
 
 
-def _build_handover_summary(row, shifts_by_id: dict[int, dict[str, Any]], attachments_by_owner: dict[int, list[dict[str, Any]]]):
+def _build_handover_summary(
+    row,
+    shifts_by_id: dict[int, dict[str, Any]],
+    floors_by_id: dict[int, dict[str, Any]],
+    attachments_by_owner: dict[int, list[dict[str, Any]]],
+):
     shift_group_id = _safe_int(row["shift_group_id"])
+    floor_id = _safe_int(row["floor_id"])
     shift = shifts_by_id.get(shift_group_id, {})
+    floor = floors_by_id.get(floor_id, {})
+    supervisor = _get_supervisor_for_person(row["receiver_user"])
     return {
         "id": int(row["id"]),
         "title": _normalize_text(row["title"]),
         "shiftGroupId": shift_group_id,
         "shiftName": _normalize_text(shift.get("name")) or "--",
+        "floorId": floor_id,
+        "floorName": _normalize_text(floor.get("name")) or "--",
         "recordTime": _normalize_text(row["record_time"]),
         "handoverUser": _normalize_text(row["handover_user"]),
         "receiverUser": _normalize_text(row["receiver_user"]),
+        "receiverSupervisorUser": supervisor["username"],
+        "receiverSupervisorLabel": supervisor["label"],
         "workSummary": _normalize_text(row["work_summary"]),
         "precautions": _normalize_text(row["precautions"]),
         "pendingItems": _normalize_text(row["pending_items"]),
@@ -566,6 +613,7 @@ def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]
         "assigneeUser": _normalize_text(row["assignee_user"]),
         "creatorUser": _normalize_text(row["creator_user"]),
         "handoverRecordId": _safe_int(row["handover_record_id"]),
+        "supervisorLabel": "",
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "completedAt": _normalize_text(row["completed_at"]),
@@ -581,7 +629,8 @@ def _normalize_text(value) -> str:
 
 def _normalize_role(value) -> str:
     role = _normalize_text(value).lower()
-    return "admin" if role == "admin" else "user"
+    role = ROLE_ALIASES.get(role, role)
+    return role if role in ROLE_PERMISSION_LEVELS else "user"
 
 
 def _resolve_person_name(value) -> str:
@@ -596,6 +645,33 @@ def _resolve_person_name(value) -> str:
         if display_name == normalized_value:
             return display_name or _normalize_text(row["user"])
     return normalized_value
+
+
+def _get_supervisor_for_person(value) -> dict[str, str]:
+    normalized_value = _normalize_text(value)
+    if not normalized_value:
+        return {"username": "", "label": ""}
+
+    user_row = user_repository.fetch_user(normalized_value)
+    if not user_row:
+        for row in user_repository.fetch_all_users():
+            display_name = _normalize_text(row["display_name"])
+            username = _normalize_text(row["user"])
+            if display_name == normalized_value or username == normalized_value:
+                user_row = row
+                break
+    if not user_row:
+        return {"username": "", "label": ""}
+
+    supervisor_user = _normalize_text(user_row["supervisor_user"])
+    if not supervisor_user:
+        return {"username": "", "label": ""}
+
+    supervisor_row = user_repository.fetch_user(supervisor_user)
+    supervisor_label = ""
+    if supervisor_row:
+        supervisor_label = _normalize_text(supervisor_row["display_name"]) or _normalize_text(supervisor_row["user"])
+    return {"username": supervisor_user, "label": supervisor_label or supervisor_user}
 
 
 def _safe_int(value) -> int | None:

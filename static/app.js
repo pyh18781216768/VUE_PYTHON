@@ -648,8 +648,12 @@
         displayName: "",
         displayLabel: "",
         department: "",
+        supervisorUser: "",
+        supervisorLabel: "",
         email: "",
         phone: "",
+        role: "user",
+        permissionLevel: 1,
         updatedAt: "",
       });
 
@@ -677,6 +681,7 @@
         username: "",
         displayName: "",
         department: "",
+        supervisorUser: "",
         email: "",
         phone: "",
         newPassword: "",
@@ -693,6 +698,14 @@
       const filters = reactive({});
       const thresholds = reactive({ yellow: 0, red: 0, compareMode: "direct" });
       const detailSort = reactive([{ field: "severityValue", direction: "desc" }]);
+      const handoverSort = reactive([
+        { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "desc" },
+      ]);
+      const taskSort = reactive([
+        { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "desc" },
+      ]);
       const userSort = reactive([
         { field: "createdAt", direction: "desc" },
         { field: "id", direction: "desc" },
@@ -758,6 +771,7 @@
         id: "",
         title: "",
         shiftGroupId: "",
+        floorId: "",
         recordTime: "",
         handoverUser: "",
         receiverUser: "",
@@ -810,7 +824,7 @@
       const floorFormOpen = ref(false);
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
-      const isAdmin = computed(() => (authUser.value.role || "") === "admin");
+      const isAdmin = computed(() => Number(authUser.value.permissionLevel || 1) >= 5);
       const activeSystemLoading = computed(() =>
         systemMode.value === "tasks" ? taskSystemLoading.value : loading.value
       );
@@ -822,6 +836,9 @@
       const taskUsers = computed(() => taskSystem.value.users || []);
       const shiftSelectOptions = computed(() =>
         shiftOptions.value.map((item) => ({ value: String(item.id), label: item.name }))
+      );
+      const floorSelectOptions = computed(() =>
+        floorOptions.value.map((item) => ({ value: String(item.id), label: item.name }))
       );
       const userSelectOptions = computed(() =>
         taskUsers.value.map((item) => ({ value: item.displayLabel, label: item.displayLabel }))
@@ -835,13 +852,27 @@
       const handoverRecordSelectOptions = computed(() =>
         (taskSystem.value.handovers || []).map((item) => ({
           value: String(item.id),
-          label: `${item.title} / ${item.recordTime}`,
+          label: getHandoverRecordLabel(item.id),
         }))
       );
       const roleSelectOptions = [
         { value: "user", label: "普通用户" },
+        { value: "line_leader", label: "线组长" },
+        { value: "section_chief", label: "科长" },
+        { value: "department_head", label: "部长" },
         { value: "admin", label: "超级管理员" },
       ];
+      const supervisorSelectOptions = computed(() =>
+        taskUsers.value
+          .filter((item) =>
+            ["line_leader", "section_chief", "department_head"].includes(item.role) &&
+            item.username !== profileForm.username
+          )
+          .map((item) => ({
+            value: item.username,
+            label: `${item.displayLabel} / ${getRoleLabel(item.role)}`,
+          }))
+      );
       const compareModeSelectOptions = [
         { value: "absolute", label: "按绝对值" },
         { value: "direct", label: "按原值" },
@@ -850,8 +881,8 @@
         { value: "range", label: "时间段" },
         { value: "single", label: "某一天" },
       ];
-      const filteredTaskHandovers = computed(() =>
-        (taskSystem.value.handovers || []).filter((item) => {
+      const filteredTaskHandovers = computed(() => {
+        const rows = (taskSystem.value.handovers || []).filter((item) => {
           if (handoverFilters.dateFrom && item.recordTime.slice(0, 10) < handoverFilters.dateFrom) return false;
           if (handoverFilters.dateTo && item.recordTime.slice(0, 10) > handoverFilters.dateTo) return false;
           if (
@@ -866,8 +897,10 @@
             const haystack = [
               item.title,
               item.shiftName,
+              item.floorName,
               item.handoverUser,
               item.receiverUser,
+              item.receiverSupervisorLabel,
               item.workSummary,
               item.precautions,
               item.pendingItems,
@@ -878,10 +911,11 @@
             if (!haystack.includes(handoverFilters.keyword.toLowerCase())) return false;
           }
           return true;
-        })
-      );
-      const filteredTaskItems = computed(() =>
-        (taskSystem.value.tasks || []).filter((item) => {
+        });
+        return sortRows(rows, handoverSort);
+      });
+      const filteredTaskItems = computed(() => {
+        const rows = (taskSystem.value.tasks || []).filter((item) => {
           if (taskFilters.status && item.status !== taskFilters.status) return false;
           if (taskFilters.assigneeUser && item.assigneeUser !== taskFilters.assigneeUser) return false;
           if (taskFilters.keyword) {
@@ -892,14 +926,16 @@
               item.priority,
               item.assigneeUser,
               item.creatorUser,
+              item.supervisorLabel,
             ]
               .join(" ")
               .toLowerCase();
             if (!haystack.includes(taskFilters.keyword.toLowerCase())) return false;
           }
           return true;
-        })
-      );
+        });
+        return sortRows(rows, taskSort);
+      });
       const filteredTaskUsers = computed(() => {
         const rows = (taskSystem.value.users || []).filter((item) => {
           if (userFilters.role && item.role !== userFilters.role) return false;
@@ -1506,8 +1542,12 @@
             displayName: "",
             displayLabel: "",
             department: "",
+            supervisorUser: "",
+            supervisorLabel: "",
             email: "",
             phone: "",
+            role: "user",
+            permissionLevel: 1,
             updatedAt: "",
           };
           syncRouteWithState(true);
@@ -1548,6 +1588,7 @@
         profileForm.username = authUser.value.username || "";
         profileForm.displayName = authUser.value.displayName || "";
         profileForm.department = authUser.value.department || "";
+        profileForm.supervisorUser = authUser.value.supervisorUser || "";
         profileForm.email = authUser.value.email || "";
         profileForm.phone = authUser.value.phone || "";
         profileForm.newPassword = "";
@@ -1559,6 +1600,7 @@
         handoverForm.id = "";
         handoverForm.title = "";
         handoverForm.shiftGroupId = String(taskSystem.value.currentUser?.shiftGroupId || "");
+        handoverForm.floorId = "";
         handoverForm.recordTime = new Date().toISOString().slice(0, 16);
         handoverForm.handoverUser = authUser.value.displayLabel || authUser.value.username || "";
         handoverForm.receiverUser = "";
@@ -1623,7 +1665,8 @@
       }
 
       function getRoleLabel(role) {
-        return role === "admin" ? "超级管理员" : "普通用户";
+        const option = roleSelectOptions.find((item) => item.value === role);
+        return option?.label || "普通用户";
       }
 
       function resetShiftForm() {
@@ -1802,8 +1845,12 @@
           displayName: "",
           displayLabel: "",
           department: "",
+          supervisorUser: "",
+          supervisorLabel: "",
           email: "",
           phone: "",
+          role: "user",
+          permissionLevel: 1,
           updatedAt: "",
         };
         taskSystem.value = createEmptyTaskSystem();
@@ -1855,6 +1902,10 @@
           setTaskActionMessage("请选择班次。", "error");
           return false;
         }
+        if (!handoverForm.floorId) {
+          setTaskActionMessage("请选择楼层。", "error");
+          return false;
+        }
         if (!handoverForm.receiverUser) {
           setTaskActionMessage("请选择接班人。", "error");
           return false;
@@ -1881,7 +1932,7 @@
       function validateUserForm() {
         const username = userForm.username.trim();
         if (!username) {
-          setTaskActionMessage("请输入用户名。", "error");
+          setTaskActionMessage("请输入工号。", "error");
           return false;
         }
         if (!userForm.displayName.trim()) {
@@ -1925,6 +1976,7 @@
         handoverForm.id = String(record.id);
         handoverForm.title = record.title;
         handoverForm.shiftGroupId = String(record.shiftGroupId || "");
+        handoverForm.floorId = String(record.floorId || "");
         handoverForm.recordTime = (record.recordTime || "").replace(" ", "T").slice(0, 16);
         handoverForm.handoverUser = record.handoverUser;
         handoverForm.receiverUser = record.receiverUser;
@@ -1977,6 +2029,7 @@
             {
               ...handoverPayload,
               shiftGroupId: handoverForm.shiftGroupId || null,
+              floorId: handoverForm.floorId || null,
             },
             handoverFiles.value
           );
@@ -2660,49 +2713,103 @@
         return detailSort.length > 1 ? `${arrow}${index + 1}` : arrow;
       }
 
-      function getDefaultUserSortDirection(field) {
+      function getDefaultListSortDirection(field) {
         return ["id", "createdAt", "updatedAt"].includes(field) ? "desc" : "asc";
       }
 
-      function resetUserSort() {
-        userSort.splice(
+      function resetListSort(sortState) {
+        sortState.splice(
           0,
-          userSort.length,
+          sortState.length,
           { field: "createdAt", direction: "desc" },
           { field: "id", direction: "desc" }
         );
       }
 
-      function toggleUserSort(field, event) {
+      function toggleListSort(sortState, field, event) {
         const keepExisting = Boolean(event?.shiftKey);
-        const existingIndex = userSort.findIndex((item) => item.field === field);
+        const existingIndex = sortState.findIndex((item) => item.field === field);
 
         if (existingIndex < 0) {
-          const nextSort = { field, direction: getDefaultUserSortDirection(field) };
+          const nextSort = { field, direction: getDefaultListSortDirection(field) };
           if (keepExisting) {
-            userSort.push(nextSort);
+            sortState.push(nextSort);
           } else {
-            userSort.splice(0, userSort.length, nextSort);
+            sortState.splice(0, sortState.length, nextSort);
           }
           return;
         }
 
         const nextSort = {
           field,
-          direction: userSort[existingIndex].direction === "asc" ? "desc" : "asc",
+          direction: sortState[existingIndex].direction === "asc" ? "desc" : "asc",
         };
         if (keepExisting) {
-          userSort.splice(existingIndex, 1, nextSort);
+          sortState.splice(existingIndex, 1, nextSort);
         } else {
-          userSort.splice(0, userSort.length, nextSort);
+          sortState.splice(0, sortState.length, nextSort);
         }
       }
 
-      function getUserSortIndicator(field) {
-        const index = userSort.findIndex((item) => item.field === field);
+      function getListSortIndicator(sortState, field) {
+        const index = sortState.findIndex((item) => item.field === field);
         if (index < 0) return "--";
-        const arrow = userSort[index].direction === "asc" ? "^" : "v";
-        return userSort.length > 1 ? `${arrow}${index + 1}` : arrow;
+        const arrow = sortState[index].direction === "asc" ? "^" : "v";
+        return sortState.length > 1 ? `${arrow}${index + 1}` : arrow;
+      }
+
+      function resetHandoverSort() {
+        resetListSort(handoverSort);
+      }
+
+      function toggleHandoverSort(field, event) {
+        toggleListSort(handoverSort, field, event);
+      }
+
+      function getHandoverSortIndicator(field) {
+        return getListSortIndicator(handoverSort, field);
+      }
+
+      function resetTaskSort() {
+        resetListSort(taskSort);
+      }
+
+      function toggleTaskSort(field, event) {
+        toggleListSort(taskSort, field, event);
+      }
+
+      function getTaskSortIndicator(field) {
+        return getListSortIndicator(taskSort, field);
+      }
+
+      function resetUserSort() {
+        resetListSort(userSort);
+      }
+
+      function toggleUserSort(field, event) {
+        toggleListSort(userSort, field, event);
+      }
+
+      function getUserSortIndicator(field) {
+        return getListSortIndicator(userSort, field);
+      }
+
+      function getHandoverRecordLabel(recordId) {
+        const normalizedId = Number(recordId);
+        const record = (taskSystem.value.handovers || []).find((item) => Number(item.id) === normalizedId);
+        if (!record) return recordId ? `#${recordId}` : "--";
+        const people = [record.handoverUser, record.receiverUser].filter(Boolean).join(" → ");
+        return [
+          `#${record.id}`,
+          record.title,
+          record.shiftName,
+          record.floorName,
+          people,
+          record.receiverSupervisorLabel ? `主管：${record.receiverSupervisorLabel}` : "",
+          formatDateTime(record.createdAt || record.recordTime),
+        ]
+          .filter(Boolean)
+          .join(" / ");
       }
 
       function ensureCharts() {
@@ -3105,7 +3212,9 @@
         floorOptions,
         taskUsers,
         shiftSelectOptions,
+        floorSelectOptions,
         userSelectOptions,
+        supervisorSelectOptions,
         statusSelectOptions,
         prioritySelectOptions,
         handoverRecordSelectOptions,
@@ -3172,9 +3281,16 @@
         toggleDetailSort,
         getSortIndicator,
         getDetailSortIndicator,
+        resetHandoverSort,
+        toggleHandoverSort,
+        getHandoverSortIndicator,
+        resetTaskSort,
+        toggleTaskSort,
+        getTaskSortIndicator,
         resetUserSort,
         toggleUserSort,
         getUserSortIndicator,
+        getHandoverRecordLabel,
         handleFileSelection,
         editHandover,
         editTask,

@@ -37,7 +37,7 @@ def admin_required(view_func):
     @login_required
     def wrapped(*args, **kwargs):
         profile = get_user_summary(current_username())
-        if profile["role"] != "admin":
+        if int(profile.get("permissionLevel") or 1) < 5:
             return jsonify({"message": "当前账号没有管理员权限。"}), 403
         return view_func(*args, **kwargs)
 
