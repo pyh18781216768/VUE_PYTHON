@@ -33,6 +33,17 @@ def ensure_task_tables() -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS FLOOR_SETTING (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS HANDOVER_RECORD (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
@@ -162,6 +173,62 @@ def update_shift_group(shift_group_id: int, payload: dict) -> None:
 def delete_shift_group(shift_group_id: int) -> None:
     with get_connection() as connection:
         connection.execute("DELETE FROM SHIFT_GROUP WHERE id = ?", (shift_group_id,))
+        connection.commit()
+
+
+def fetch_all_floors():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM FLOOR_SETTING
+            ORDER BY sort_order, id
+            """
+        ).fetchall()
+
+
+def fetch_floor(floor_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM FLOOR_SETTING WHERE id = ?",
+            (floor_id,),
+        ).fetchone()
+
+
+def fetch_floor_by_name(name: str):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM FLOOR_SETTING WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+
+def insert_floor(payload: dict) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO FLOOR_SETTING (
+                name,
+                sort_order,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                :name,
+                :sort_order,
+                :created_at,
+                :updated_at
+            )
+            """,
+            payload,
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def delete_floor(floor_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM FLOOR_SETTING WHERE id = ?", (floor_id,))
         connection.commit()
 
 

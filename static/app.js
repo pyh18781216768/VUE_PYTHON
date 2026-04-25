@@ -236,6 +236,7 @@
     currentUser: null,
     users: [],
     shifts: [],
+    floors: [],
     settings: {},
     handovers: [],
     tasks: [],
@@ -492,8 +493,8 @@
       const root = ref(null);
       const query = ref("");
       const open = ref(false);
-      const suppressNextFocusClear = ref(false);
       const lastChosenLabel = ref("");
+      let lastChooseAt = 0;
 
       const normalizedOptions = computed(() => {
         const items = props.options.map((item) => {
@@ -530,7 +531,7 @@
         emit("update:modelValue", option.value);
         query.value = option.label;
         lastChosenLabel.value = option.label;
-        suppressNextFocusClear.value = true;
+        lastChooseAt = Date.now();
         open.value = false;
       }
 
@@ -543,12 +544,17 @@
       }
 
       function handleFocus() {
-        if (suppressNextFocusClear.value) {
-          suppressNextFocusClear.value = false;
+        if (Date.now() - lastChooseAt < 250) {
           query.value = lastChosenLabel.value || selectedOption.value?.label || "";
           open.value = false;
           return;
         }
+        query.value = "";
+        open.value = true;
+      }
+
+      function handleClick() {
+        if (Date.now() - lastChooseAt < 250) return;
         query.value = "";
         open.value = true;
       }
@@ -582,6 +588,7 @@
         filteredOptions,
         choose,
         handleFocus,
+        handleClick,
         handleInput,
         selectFirst,
         close,
@@ -598,6 +605,7 @@
           :disabled="disabled"
           autocomplete="off"
           @focus="handleFocus"
+          @click="handleClick"
           @input="handleInput"
           @keydown.enter.prevent="selectFirst"
           @keydown.esc.prevent="close"
@@ -685,6 +693,10 @@
       const filters = reactive({});
       const thresholds = reactive({ yellow: 0, red: 0, compareMode: "direct" });
       const detailSort = reactive([{ field: "severityValue", direction: "desc" }]);
+      const userSort = reactive([
+        { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "desc" },
+      ]);
       const detailMode = ref("rate");
       const exportForm = reactive({
         filters: {},
@@ -738,7 +750,9 @@
       });
       const shiftFilters = reactive({
         keyword: "",
-        isActive: "",
+      });
+      const floorFilters = reactive({
+        keyword: "",
       });
       const handoverForm = reactive({
         id: "",
@@ -778,7 +792,11 @@
         startTime: "08:00",
         endTime: "16:00",
         sortOrder: 0,
-        isActive: true,
+      });
+      const floorForm = reactive({
+        id: "",
+        name: "",
+        sortOrder: 0,
       });
       const handoverFiles = ref([]);
       const taskFiles = ref([]);
@@ -789,6 +807,7 @@
       const taskFormOpen = ref(false);
       const userFormOpen = ref(false);
       const shiftFormOpen = ref(false);
+      const floorFormOpen = ref(false);
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
       const isAdmin = computed(() => (authUser.value.role || "") === "admin");
@@ -799,6 +818,7 @@
         systemMode.value === "tasks" ? taskSystemError.value : error.value
       );
       const shiftOptions = computed(() => taskSystem.value.shifts || []);
+      const floorOptions = computed(() => taskSystem.value.floors || []);
       const taskUsers = computed(() => taskSystem.value.users || []);
       const shiftSelectOptions = computed(() =>
         shiftOptions.value.map((item) => ({ value: String(item.id), label: item.name }))
@@ -880,8 +900,8 @@
           return true;
         })
       );
-      const filteredTaskUsers = computed(() =>
-        (taskSystem.value.users || []).filter((item) => {
+      const filteredTaskUsers = computed(() => {
+        const rows = (taskSystem.value.users || []).filter((item) => {
           if (userFilters.role && item.role !== userFilters.role) return false;
           if (userFilters.keyword) {
             const haystack = [
@@ -897,18 +917,27 @@
             if (!haystack.includes(userFilters.keyword.toLowerCase())) return false;
           }
           return true;
-        })
-      );
+        });
+        return sortRows(rows, userSort);
+      });
       const filteredShiftOptions = computed(() =>
         shiftOptions.value.filter((item) => {
-          if (shiftFilters.isActive !== "" && String(item.isActive) !== String(shiftFilters.isActive)) {
-            return false;
-          }
           if (shiftFilters.keyword) {
             const haystack = [item.name, item.startTime, item.endTime, item.sortOrder]
               .join(" ")
               .toLowerCase();
             if (!haystack.includes(shiftFilters.keyword.toLowerCase())) return false;
+          }
+          return true;
+        })
+      );
+      const filteredFloorOptions = computed(() =>
+        floorOptions.value.filter((item) => {
+          if (floorFilters.keyword) {
+            const haystack = [item.name, item.sortOrder]
+              .join(" ")
+              .toLowerCase();
+            if (!haystack.includes(floorFilters.keyword.toLowerCase())) return false;
           }
           return true;
         })
@@ -1603,7 +1632,6 @@
         shiftForm.startTime = "08:00";
         shiftForm.endTime = "16:00";
         shiftForm.sortOrder = 0;
-        shiftForm.isActive = true;
       }
 
       function openShiftForm() {
@@ -1614,6 +1642,22 @@
       function closeShiftForm() {
         resetShiftForm();
         shiftFormOpen.value = false;
+      }
+
+      function resetFloorForm() {
+        floorForm.id = "";
+        floorForm.name = "";
+        floorForm.sortOrder = 0;
+      }
+
+      function openFloorForm() {
+        resetFloorForm();
+        floorFormOpen.value = true;
+      }
+
+      function closeFloorForm() {
+        resetFloorForm();
+        floorFormOpen.value = false;
       }
 
       function resetFilters() {
@@ -1823,6 +1867,14 @@
           setTaskActionMessage("请输入任务标题。", "error");
           return false;
         }
+        if (taskForm.startAt && taskForm.dueAt) {
+          const startTime = new Date(taskForm.startAt).getTime();
+          const dueTime = new Date(taskForm.dueAt).getTime();
+          if (Number.isFinite(startTime) && Number.isFinite(dueTime) && dueTime < startTime) {
+            setTaskActionMessage("到期时间不能早于开始时间。", "error");
+            return false;
+          }
+        }
         return true;
       }
 
@@ -2024,6 +2076,33 @@
         }
       }
 
+      async function submitFloor() {
+        if (!isTaskFormIdle()) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson("/api/task-system/floors", {
+            method: "POST",
+            body: JSON.stringify({
+              ...floorForm,
+              id: floorForm.id || null,
+            }),
+          });
+          upsertTaskSystemItem("floors", responsePayload.item);
+          resetFloorForm();
+          floorFormOpen.value = false;
+          setTaskActionMessage("楼层设置已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
       async function deleteShift(item) {
         if (!isTaskFormIdle()) return;
         const confirmed = window.confirm(`确认删除班次“${item.name}”？`);
@@ -2036,6 +2115,29 @@
             (shift) => Number(shift.id) !== Number(item.id)
           );
           setTaskActionMessage("班次已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function deleteFloor(item) {
+        if (!isTaskFormIdle()) return;
+        const confirmed = window.confirm(`确认删除楼层“${item.name}”？`);
+        if (!confirmed) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          await requestJson(`/api/task-system/floors/${item.id}`, { method: "DELETE" });
+          taskSystem.value.floors = (taskSystem.value.floors || []).filter(
+            (floor) => Number(floor.id) !== Number(item.id)
+          );
+          setTaskActionMessage("楼层已删除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -2488,7 +2590,15 @@
         return rows.slice().sort((left, right) => {
           for (const criterion of sortState) {
             const direction = criterion.direction === "asc" ? 1 : -1;
-            const result = compareValues(left[criterion.field], right[criterion.field]);
+            const leftValue = left[criterion.field];
+            const rightValue = right[criterion.field];
+            const leftEmpty = leftValue === null || leftValue === undefined || Number.isNaN(leftValue) || leftValue === "";
+            const rightEmpty = rightValue === null || rightValue === undefined || Number.isNaN(rightValue) || rightValue === "";
+            if (leftEmpty || rightEmpty) {
+              if (leftEmpty && rightEmpty) continue;
+              return leftEmpty ? 1 : -1;
+            }
+            const result = compareValues(leftValue, rightValue);
             if (result !== 0) return result * direction;
           }
           return 0;
@@ -2548,6 +2658,51 @@
         if (index < 0) return "--";
         const arrow = detailSort[index].direction === "asc" ? "^" : "v";
         return detailSort.length > 1 ? `${arrow}${index + 1}` : arrow;
+      }
+
+      function getDefaultUserSortDirection(field) {
+        return ["id", "createdAt", "updatedAt"].includes(field) ? "desc" : "asc";
+      }
+
+      function resetUserSort() {
+        userSort.splice(
+          0,
+          userSort.length,
+          { field: "createdAt", direction: "desc" },
+          { field: "id", direction: "desc" }
+        );
+      }
+
+      function toggleUserSort(field, event) {
+        const keepExisting = Boolean(event?.shiftKey);
+        const existingIndex = userSort.findIndex((item) => item.field === field);
+
+        if (existingIndex < 0) {
+          const nextSort = { field, direction: getDefaultUserSortDirection(field) };
+          if (keepExisting) {
+            userSort.push(nextSort);
+          } else {
+            userSort.splice(0, userSort.length, nextSort);
+          }
+          return;
+        }
+
+        const nextSort = {
+          field,
+          direction: userSort[existingIndex].direction === "asc" ? "desc" : "asc",
+        };
+        if (keepExisting) {
+          userSort.splice(existingIndex, 1, nextSort);
+        } else {
+          userSort.splice(0, userSort.length, nextSort);
+        }
+      }
+
+      function getUserSortIndicator(field) {
+        const index = userSort.findIndex((item) => item.field === field);
+        if (index < 0) return "--";
+        const arrow = userSort[index].direction === "asc" ? "^" : "v";
+        return userSort.length > 1 ? `${arrow}${index + 1}` : arrow;
       }
 
       function ensureCharts() {
@@ -2919,10 +3074,12 @@
         taskFilters,
         userFilters,
         shiftFilters,
+        floorFilters,
         handoverForm,
         taskForm,
         userForm,
         shiftForm,
+        floorForm,
         handoverFiles,
         taskFiles,
         taskActionSubmitting,
@@ -2932,8 +3089,10 @@
         taskFormOpen,
         userFormOpen,
         shiftFormOpen,
+        floorFormOpen,
         filteredTaskUsers,
         filteredShiftOptions,
+        filteredFloorOptions,
         pageConfig,
         currentRows,
         detailRows,
@@ -2943,6 +3102,7 @@
         usesTimelineDetail,
         isAdmin,
         shiftOptions,
+        floorOptions,
         taskUsers,
         shiftSelectOptions,
         userSelectOptions,
@@ -3012,6 +3172,9 @@
         toggleDetailSort,
         getSortIndicator,
         getDetailSortIndicator,
+        resetUserSort,
+        toggleUserSort,
+        getUserSortIndicator,
         handleFileSelection,
         editHandover,
         editTask,
@@ -3024,16 +3187,21 @@
         closeUserForm,
         openShiftForm,
         closeShiftForm,
+        openFloorForm,
+        closeFloorForm,
         submitHandover,
         submitTask,
         submitUser,
         submitShift,
+        submitFloor,
         deleteShift,
+        deleteFloor,
         downloadTaskExport,
         resetHandoverForm,
         resetTaskForm,
         resetUserForm,
         resetShiftForm,
+        resetFloorForm,
         openProfileDialog,
         closeProfileDialog,
         resetProfileForm,

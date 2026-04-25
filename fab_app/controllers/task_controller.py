@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, send_file
 from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.services.task_export_service import export_task_data
 from fab_app.services.task_system_service import (
+    delete_floor,
     delete_shift_group,
     get_attachment_file,
     get_reminders,
@@ -16,10 +17,12 @@ from fab_app.services.task_system_service import (
     get_user_summary,
     get_system_settings,
     list_handover_records,
+    list_floors,
     list_shift_groups,
     list_tasks,
     list_users,
     save_handover_record,
+    save_floor,
     save_shift_group,
     save_task,
     save_user,
@@ -89,6 +92,33 @@ def delete_task_shift(shift_group_id: int):
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"message": "班次已删除。"})
+
+
+@task_blueprint.get("/api/task-system/floors")
+@login_required
+def task_floors():
+    return jsonify({"items": list_floors()})
+
+
+@task_blueprint.post("/api/task-system/floors")
+@admin_required
+def save_task_floor():
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = save_floor(payload)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.delete("/api/task-system/floors/<int:floor_id>")
+@admin_required
+def delete_task_floor(floor_id: int):
+    try:
+        delete_floor(floor_id)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "楼层已删除。"})
 
 
 @task_blueprint.get("/api/task-system/settings")

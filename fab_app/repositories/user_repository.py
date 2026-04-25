@@ -68,7 +68,7 @@ def fetch_all_users():
                 created_at,
                 updated_at
             FROM USER
-            ORDER BY user
+            ORDER BY created_at DESC, rowid DESC
             """
         ).fetchall()
 

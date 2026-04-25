@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260425-17" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260425-21" />
   </head>
   <body>
     {% raw %}
@@ -287,7 +287,7 @@
                       <tr>
                         <th>标题</th>
                         <th>班次</th>
-                        <th>时间</th>
+                        <th>创建时间</th>
                         <th>交班人</th>
                         <th>接班人</th>
                         <th>未完成事项</th>
@@ -423,6 +423,7 @@
                         <th>状态</th>
                         <th>优先级</th>
                         <th>负责人</th>
+                        <th>创建时间</th>
                         <th>开始时间</th>
                         <th>到期时间</th>
                         <th>关联交接</th>
@@ -436,6 +437,7 @@
                         <td>{{ item.status }}</td>
                         <td>{{ item.priority }}</td>
                         <td>{{ item.assigneeUser || '--' }}</td>
+                        <td>{{ formatDateTime(item.createdAt) }}</td>
                         <td>{{ formatDateTime(item.startAt) }}</td>
                         <td>{{ formatDateTime(item.dueAt) }}</td>
                         <td>{{ item.handoverRecordId || '--' }}</td>
@@ -446,7 +448,7 @@
                         <td><button class="btn-ghost table-action" type="button" @click="editTask(item)">编辑</button></td>
                       </tr>
                       <tr v-if="!filteredTaskItems.length">
-                        <td colspan="9" class="empty-cell">当前条件下没有任务数据</td>
+                        <td colspan="10" class="empty-cell">当前条件下没有任务数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -533,30 +535,65 @@
                 <div class="section-head">
                   <div>
                     <h2>账号列表</h2>
-                    <p>点击编辑可回填用户资料。</p>
+                    <p>默认按创建时间排序，点击表头排序，按住 Shift 可叠加多重排序。</p>
                   </div>
+                  <button class="btn-secondary" type="button" @click="resetUserSort">重置排序</button>
                 </div>
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>用户名</th>
-                        <th>姓名</th>
-                        <th>角色</th>
-                        <th>更新时间</th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('id', $event)">
+                            <strong>ID</strong>
+                            <span>{{ getUserSortIndicator('id') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('username', $event)">
+                            <strong>用户名</strong>
+                            <span>{{ getUserSortIndicator('username') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('displayLabel', $event)">
+                            <strong>姓名</strong>
+                            <span>{{ getUserSortIndicator('displayLabel') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('role', $event)">
+                            <strong>角色</strong>
+                            <span>{{ getUserSortIndicator('role') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('createdAt', $event)">
+                            <strong>创建时间</strong>
+                            <span>{{ getUserSortIndicator('createdAt') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('updatedAt', $event)">
+                            <strong>更新时间</strong>
+                            <span>{{ getUserSortIndicator('updatedAt') }}</span>
+                          </button>
+                        </th>
                         <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="item in filteredTaskUsers" :key="item.username + '-list'">
+                        <td>{{ item.id }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.displayLabel }}</td>
                         <td>{{ getRoleLabel(item.role) }}</td>
+                        <td>{{ formatDateTime(item.createdAt) }}</td>
                         <td>{{ formatDateTime(item.updatedAt) }}</td>
                         <td><button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button></td>
                       </tr>
                       <tr v-if="!filteredTaskUsers.length">
-                        <td colspan="5" class="empty-cell">当前条件下没有用户数据</td>
+                        <td colspan="7" class="empty-cell">当前条件下没有用户数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -570,7 +607,7 @@
               <div class="section-head">
                 <div>
                   <h2>班次查询</h2>
-                  <p>支持按班次名称、时间和启用状态检索。</p>
+                  <p>支持按班次名称、时间和排序检索。</p>
                 </div>
                 <button class="btn-secondary" type="button" @click="openShiftForm">新增</button>
               </div>
@@ -578,14 +615,6 @@
                 <label>
                   <span>关键词</span>
                   <input v-model.trim="shiftFilters.keyword" type="text" placeholder="搜索班次名称、时间、排序" />
-                </label>
-                <label>
-                  <span>班次状态</span>
-                  <searchable-select
-                    v-model="shiftFilters.isActive"
-                    :options="[{ value: 'true', label: '启用' }, { value: 'false', label: '停用' }]"
-                    empty-label="全部"
-                  ></searchable-select>
                 </label>
               </div>
             </section>
@@ -619,10 +648,6 @@
                         <span>排序</span>
                         <input v-model.number="shiftForm.sortOrder" type="number" />
                       </label>
-                      <label class="form-span-2 checkbox-line">
-                        <input v-model="shiftForm.isActive" type="checkbox" />
-                        <span>班次启用</span>
-                      </label>
                       <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
                         {{ taskActionMessage }}
                       </p>
@@ -650,7 +675,6 @@
                         <th>开始</th>
                         <th>结束</th>
                         <th>排序</th>
-                        <th>状态</th>
                         <th>操作</th>
                       </tr>
                     </thead>
@@ -660,11 +684,90 @@
                         <td>{{ item.startTime }}</td>
                         <td>{{ item.endTime }}</td>
                         <td>{{ item.sortOrder }}</td>
-                        <td>{{ item.isActive ? '启用' : '停用' }}</td>
                         <td><button class="btn-ghost table-action" type="button" @click="deleteShift(item)">删除</button></td>
                       </tr>
                       <tr v-if="!filteredShiftOptions.length">
-                        <td colspan="6" class="empty-cell">当前条件下没有班次数据</td>
+                        <td colspan="5" class="empty-cell">当前条件下没有班次数据</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <section class="filters card">
+                <div class="section-head">
+                  <div>
+                    <h2>楼层查询</h2>
+                    <p>支持多个楼层设置，可按楼层名称和排序检索。</p>
+                  </div>
+                  <button class="btn-secondary" type="button" @click="openFloorForm">新增</button>
+                </div>
+                <div class="task-filter-grid">
+                  <label>
+                    <span>关键词</span>
+                    <input v-model.trim="floorFilters.keyword" type="text" placeholder="搜索楼层名称、排序" />
+                  </label>
+                </div>
+              </section>
+
+              <teleport to="body">
+                <div v-if="floorFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>新增楼层</h2>
+                        <p>用于维护系统内可选楼层配置。</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closeFloorForm">关闭</button>
+                    </div>
+                    <form class="task-form-grid" @submit.prevent="submitFloor">
+                      <label>
+                        <span>楼层名称</span>
+                        <input v-model.trim="floorForm.name" type="text" placeholder="例如：1F / 二楼 / A栋3层" />
+                      </label>
+                      <label>
+                        <span>排序</span>
+                        <input v-model.number="floorForm.sortOrder" type="number" />
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="resetFloorForm">重置</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存楼层' }}</button>
+                      </div>
+                    </form>
+                  </article>
+                </div>
+              </teleport>
+
+              <article class="card task-table-card">
+                <div class="section-head">
+                  <div>
+                    <h2>楼层列表</h2>
+                    <p>楼层可按需要新增多个，列表内可删除不再需要的楼层。</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>楼层</th>
+                        <th>排序</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in filteredFloorOptions" :key="item.id + '-floor'">
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.sortOrder }}</td>
+                        <td>{{ formatDateTime(item.createdAt) }}</td>
+                        <td><button class="btn-ghost table-action" type="button" @click="deleteFloor(item)">删除</button></td>
+                      </tr>
+                      <tr v-if="!filteredFloorOptions.length">
+                        <td colspan="4" class="empty-cell">当前条件下没有楼层数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1108,6 +1211,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260425-17"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260425-21"></script>
   </body>
 </html>

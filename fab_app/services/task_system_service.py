@@ -41,6 +41,7 @@ def get_task_system_payload(username: str) -> dict[str, Any]:
         "currentUser": user_profile,
         "users": list_users(),
         "shifts": list_shift_groups(),
+        "floors": list_floors(),
         "settings": get_system_settings(),
         "handovers": list_handover_records({}),
         "tasks": list_tasks({}),
@@ -110,6 +111,10 @@ def list_shift_groups() -> list[dict[str, Any]]:
     return [_build_shift_summary(row) for row in task_repository.fetch_all_shift_groups()]
 
 
+def list_floors() -> list[dict[str, Any]]:
+    return [_build_floor_summary(row) for row in task_repository.fetch_all_floors()]
+
+
 def save_shift_group(payload: dict[str, Any]) -> dict[str, Any]:
     now = _now_text()
     shift_payload = {
@@ -117,7 +122,7 @@ def save_shift_group(payload: dict[str, Any]) -> dict[str, Any]:
         "start_time": _normalize_time_text(payload.get("startTime")),
         "end_time": _normalize_time_text(payload.get("endTime")),
         "sort_order": _safe_int(payload.get("sortOrder")) or 0,
-        "is_active": 1 if payload.get("isActive", True) else 0,
+        "is_active": 1,
         "updated_at": now,
     }
     if not shift_payload["name"]:
@@ -141,6 +146,29 @@ def delete_shift_group(shift_group_id: int) -> None:
     if not task_repository.fetch_shift_group(shift_group_id):
         raise ValueError("班次不存在")
     task_repository.delete_shift_group(shift_group_id)
+
+
+def save_floor(payload: dict[str, Any]) -> dict[str, Any]:
+    now = _now_text()
+    floor_payload = {
+        "name": _normalize_text(payload.get("name")),
+        "sort_order": _safe_int(payload.get("sortOrder")) or 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+    if not floor_payload["name"]:
+        raise ValueError("楼层名称不能为空")
+    if task_repository.fetch_floor_by_name(floor_payload["name"]):
+        raise ValueError("楼层名称已存在")
+
+    floor_id = task_repository.insert_floor(floor_payload)
+    return next(item for item in list_floors() if item["id"] == floor_id)
+
+
+def delete_floor(floor_id: int) -> None:
+    if not task_repository.fetch_floor(floor_id):
+        raise ValueError("楼层不存在")
+    task_repository.delete_floor(floor_id)
 
 
 def get_system_settings() -> dict[str, Any]:
@@ -286,6 +314,8 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
 
     start_at = _normalize_datetime_text(payload.get("startAt"))
     due_at = _normalize_datetime_text(payload.get("dueAt"))
+    if start_at and due_at and _parse_datetime(due_at) < _parse_datetime(start_at):
+        raise ValueError("到期时间不能早于开始时间")
     task_payload = {
         "title": _normalize_text(payload.get("title")),
         "description": _normalize_text(payload.get("description")),
@@ -363,8 +393,6 @@ def get_reminders() -> dict[str, Any]:
 
     shift_reminders = []
     for shift in list_shift_groups():
-        if not shift["isActive"]:
-            continue
         next_start = _get_next_shift_datetime(shift["startTime"], now)
         minutes_until = int((next_start - now).total_seconds() // 60)
         if 0 <= minutes_until <= handover_minutes:
@@ -491,6 +519,16 @@ def _build_shift_summary(row) -> dict[str, Any]:
         "endTime": _normalize_text(row["end_time"]),
         "sortOrder": int(row["sort_order"] or 0),
         "isActive": bool(row["is_active"] if row["is_active"] is not None else 1),
+    }
+
+
+def _build_floor_summary(row) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "name": _normalize_text(row["name"]),
+        "sortOrder": int(row["sort_order"] or 0),
+        "createdAt": _normalize_text(row["created_at"]),
+        "updatedAt": _normalize_text(row["updated_at"]),
     }
 
 
