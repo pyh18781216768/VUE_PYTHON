@@ -522,6 +522,7 @@ body::after {
 
 .modal-backdrop {
   z-index: 48;
+  pointer-events: none;
 }
 
 .modal-layer {
@@ -531,6 +532,7 @@ body::after {
   display: grid;
   place-items: center;
   padding: 20px 14px;
+  pointer-events: none;
 }
 
 .modal-layer > .modal-backdrop {
@@ -545,6 +547,7 @@ body::after {
   overflow: auto;
   padding: 24px;
   position: relative;
+  pointer-events: auto;
 }
 
 .export-dialog {
@@ -554,6 +557,17 @@ body::after {
   overflow: auto;
   padding: 24px;
   position: relative;
+  pointer-events: auto;
+}
+
+.task-entry-dialog {
+  z-index: 50;
+  width: min(920px, calc(100% - 28px));
+  max-height: min(92vh, 920px);
+  overflow: auto;
+  padding: 24px;
+  position: relative;
+  pointer-events: auto;
 }
 
 .profile-grid {
@@ -719,6 +733,10 @@ body::after {
 .task-layout {
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
   align-items: start;
+}
+
+.task-layout-list-only {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .task-reminder-grid {
@@ -1446,6 +1464,11 @@ body::after {
   z-index: 30;
 }
 
+.task-entry-dialog:has(.searchable-select),
+.task-entry-dialog:has(.searchable-select:focus-within) {
+  z-index: 80;
+}
+
 .section-head {
   display: flex;
   justify-content: space-between;
@@ -1502,6 +1525,7 @@ label span {
 
 select,
 input,
+textarea,
 button {
   appearance: none;
   border: 1px solid rgba(103, 232, 249, 0.14);
@@ -1511,7 +1535,8 @@ button {
 }
 
 select,
-input {
+input,
+textarea {
   width: 100%;
   background: rgba(7, 21, 38, 0.92);
   color: var(--text);
@@ -1519,10 +1544,16 @@ input {
 }
 
 select:focus,
-input:focus {
+input:focus,
+textarea:focus {
   outline: none;
   border-color: rgba(103, 232, 249, 0.42);
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+textarea {
+  min-height: 108px;
+  resize: vertical;
 }
 
 .searchable-select {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260425-4" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260425-12" />
   </head>
   <body>
     {% raw %}
@@ -180,7 +180,10 @@
                   <h2>交接班查询</h2>
                   <p>支持按日期、班次、交接人、接班人和关键词检索。</p>
                 </div>
-                <button class="btn-secondary" @click="downloadTaskExport('handover', 'excel')">导出 Excel</button>
+                <div class="button-row">
+                  <button class="btn-secondary" type="button" @click="openHandoverForm">新增</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('handover', 'excel')">导出 Excel</button>
+                </div>
               </div>
               <div class="task-filter-grid">
                 <label>
@@ -210,14 +213,17 @@
               </div>
             </section>
 
-            <section class="task-layout">
-              <article class="card task-form-card">
+            <section class="task-layout task-layout-list-only">
+              <teleport to="body">
+                <div v-if="handoverFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
                     <h2>创建交接班记录</h2>
                     <p>支持当班情况、注意事项、未完成事项和附件上传。</p>
                   </div>
-                  <button class="btn-secondary" type="button" @click="resetHandoverForm">新建</button>
+                  <button class="btn-ghost" type="button" @click="closeHandoverForm">关闭</button>
                 </div>
                 <form class="task-form-grid" @submit.prevent="submitHandover">
                   <label v-if="false">
@@ -227,10 +233,6 @@
                   <label>
                     <span>班次</span>
                     <searchable-select v-model="handoverForm.shiftGroupId" :options="shiftSelectOptions" empty-label="请选择"></searchable-select>
-                  </label>
-                  <label>
-                    <span>记录时间</span>
-                    <input v-model="handoverForm.recordTime" type="datetime-local" />
                   </label>
                   <label>
                     <span>交班人</span>
@@ -260,12 +262,17 @@
                     <span>附件上传</span>
                     <input type="file" multiple @change="handleFileSelection('handover', $event)" />
                   </label>
+                  <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                    {{ taskActionMessage }}
+                  </p>
                   <div class="profile-actions form-span-2">
                     <button class="btn-secondary" type="button" @click="resetHandoverForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存交接记录' }}</button>
                   </div>
                 </form>
               </article>
+                </div>
+              </teleport>
 
               <article class="card task-table-card">
                 <div class="section-head">
@@ -319,7 +326,10 @@
                   <h2>任务查询</h2>
                   <p>可按关键词、状态、负责人筛选任务并跟踪进度。</p>
                 </div>
-                <button class="btn-secondary" @click="downloadTaskExport('task', 'excel')">导出 Excel</button>
+                <div class="button-row">
+                  <button class="btn-secondary" type="button" @click="openTaskForm">新增</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('task', 'excel')">导出 Excel</button>
+                </div>
               </div>
               <div class="task-filter-grid">
                 <label>
@@ -337,14 +347,17 @@
               </div>
             </section>
 
-            <section class="task-layout">
-              <article class="card task-form-card">
+            <section class="task-layout task-layout-list-only">
+              <teleport to="body">
+                <div v-if="taskFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
                     <h2>创建与分配任务</h2>
                     <p>任务可关联交接班记录，支持状态、优先级和到期提醒。</p>
                   </div>
-                  <button class="btn-secondary" type="button" @click="resetTaskForm">新建</button>
+                  <button class="btn-ghost" type="button" @click="closeTaskForm">关闭</button>
                 </div>
                 <form class="task-form-grid" @submit.prevent="submitTask">
                   <label>
@@ -383,12 +396,17 @@
                     <span>附件上传</span>
                     <input type="file" multiple @change="handleFileSelection('task', $event)" />
                   </label>
+                  <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                    {{ taskActionMessage }}
+                  </p>
                   <div class="profile-actions form-span-2">
                     <button class="btn-secondary" type="button" @click="resetTaskForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存任务' }}</button>
                   </div>
                 </form>
               </article>
+                </div>
+              </teleport>
 
               <article class="card task-table-card">
                 <div class="section-head">
@@ -436,14 +454,17 @@
           </template>
 
           <template v-else-if="taskSection === 'users' && isAdmin">
-            <section class="task-layout">
-              <article class="card task-form-card">
+            <section class="task-layout task-layout-list-only">
+              <teleport to="body">
+                <div v-if="userFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
                     <h2>用户管理</h2>
                     <p>超级管理员可创建账号、设置角色、启用停用和班次分组。</p>
                   </div>
-                  <button class="btn-secondary" type="button" @click="resetUserForm">新建</button>
+                  <button class="btn-ghost" type="button" @click="closeUserForm">关闭</button>
                 </div>
                 <form class="task-form-grid" @submit.prevent="submitUser">
                   <label>
@@ -482,12 +503,17 @@
                     <input v-model="userForm.isActive" type="checkbox" />
                     <span>账号启用</span>
                   </label>
+                  <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                    {{ taskActionMessage }}
+                  </p>
                   <div class="profile-actions form-span-2">
                     <button class="btn-secondary" type="button" @click="resetUserForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存用户' }}</button>
                   </div>
                 </form>
               </article>
+                </div>
+              </teleport>
 
               <article class="card task-table-card">
                 <div class="section-head">
@@ -495,6 +521,7 @@
                     <h2>账号列表</h2>
                     <p>点击编辑可回填用户资料。</p>
                   </div>
+                  <button class="btn-secondary" type="button" @click="openUserForm">新增</button>
                 </div>
                 <div class="table-wrap">
                   <table>
@@ -1060,6 +1087,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260425-4"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260425-12"></script>
   </body>
 </html>

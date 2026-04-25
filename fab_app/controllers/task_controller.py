@@ -179,8 +179,8 @@ def download_task_attachment(attachment_id: int):
 
 
 def _read_payload() -> dict:
-    if request.files:
-        raw_payload = request.form.get("payload", "{}")
+    raw_payload = request.form.get("payload")
+    if raw_payload is not None:
         try:
             return json.loads(raw_payload)
         except json.JSONDecodeError as exc:

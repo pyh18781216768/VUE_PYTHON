@@ -565,10 +565,21 @@
       onMounted(() => document.addEventListener("click", handleDocumentClick));
       onBeforeUnmount(() => document.removeEventListener("click", handleDocumentClick));
 
-      return { root, query, open, filteredOptions, choose, handleFocus, handleInput, selectFirst, close, clearValue };
+      return {
+        root,
+        query,
+        open,
+        filteredOptions,
+        choose,
+        handleFocus,
+        handleInput,
+        selectFirst,
+        close,
+        clearValue,
+      };
     },
     template: `
-      <div class="searchable-select" ref="root">
+      <div class="searchable-select" ref="root" @click.stop>
         <input
           class="searchable-select-input"
           type="text"
@@ -590,7 +601,7 @@
         >
           ×
         </button>
-        <div v-if="open" class="searchable-select-menu">
+        <div v-if="open" class="searchable-select-menu" @click.stop>
           <button
             v-for="item in filteredOptions"
             :key="item.value + ':' + item.label"
@@ -763,6 +774,9 @@
       const taskActionSubmitting = ref(false);
       const taskActionMessage = ref("");
       const taskActionTone = ref("error");
+      const handoverFormOpen = ref(false);
+      const taskFormOpen = ref(false);
+      const userFormOpen = ref(false);
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
       const isAdmin = computed(() => (authUser.value.role || "") === "admin");
@@ -1481,6 +1495,16 @@
         handoverFiles.value = [];
       }
 
+      function openHandoverForm() {
+        resetHandoverForm();
+        handoverFormOpen.value = true;
+      }
+
+      function closeHandoverForm() {
+        resetHandoverForm();
+        handoverFormOpen.value = false;
+      }
+
       function resetTaskForm() {
         taskForm.id = "";
         taskForm.title = "";
@@ -1494,6 +1518,16 @@
         taskFiles.value = [];
       }
 
+      function openTaskForm() {
+        resetTaskForm();
+        taskFormOpen.value = true;
+      }
+
+      function closeTaskForm() {
+        resetTaskForm();
+        taskFormOpen.value = false;
+      }
+
       function resetUserForm() {
         userForm.username = "";
         userForm.displayName = "";
@@ -1504,6 +1538,16 @@
         userForm.isActive = true;
         userForm.shiftGroupId = "";
         userForm.password = "";
+      }
+
+      function openUserForm() {
+        resetUserForm();
+        userFormOpen.value = true;
+      }
+
+      function closeUserForm() {
+        resetUserForm();
+        userFormOpen.value = false;
       }
 
       function getRoleLabel(role) {
@@ -1714,6 +1758,62 @@
         taskActionTone.value = tone;
       }
 
+      function isTaskFormIdle() {
+        return !taskActionSubmitting.value;
+      }
+
+      function validateHandoverForm() {
+        if (!handoverForm.shiftGroupId) {
+          setTaskActionMessage("请选择班次。", "error");
+          return false;
+        }
+        if (!handoverForm.receiverUser) {
+          setTaskActionMessage("请选择接班人。", "error");
+          return false;
+        }
+        return true;
+      }
+
+      function validateTaskForm() {
+        if (!taskForm.title.trim()) {
+          setTaskActionMessage("请输入任务标题。", "error");
+          return false;
+        }
+        return true;
+      }
+
+      function validateUserForm() {
+        const username = userForm.username.trim();
+        if (!username) {
+          setTaskActionMessage("请输入用户名。", "error");
+          return false;
+        }
+        if (!userForm.displayName.trim()) {
+          setTaskActionMessage("请输入姓名。", "error");
+          return false;
+        }
+        const isExistingUser = taskUsers.value.some((item) => item.username === username);
+        if (!isExistingUser && !userForm.password.trim()) {
+          setTaskActionMessage("新建用户时必须设置密码。", "error");
+          return false;
+        }
+        return true;
+      }
+
+      function upsertTaskSystemItem(collectionName, item) {
+        if (!item) return;
+        const currentItems = taskSystem.value[collectionName] || [];
+        const itemId = Number(item.id);
+        const existingIndex = currentItems.findIndex((currentItem) => Number(currentItem.id) === itemId);
+        if (existingIndex >= 0) {
+          taskSystem.value[collectionName] = currentItems.map((currentItem, index) =>
+            index === existingIndex ? item : currentItem
+          );
+          return;
+        }
+        taskSystem.value[collectionName] = [item, ...currentItems];
+      }
+
       function handleFileSelection(targetName, event) {
         const files = Array.from(event.target.files || []);
         if (targetName === "handover") {
@@ -1738,6 +1838,7 @@
         handoverForm.keywords = record.keywords;
         handoverFiles.value = [];
         taskSection.value = "handover";
+        handoverFormOpen.value = true;
       }
 
       function editTask(item) {
@@ -1752,6 +1853,7 @@
         taskForm.reminderAt = (item.reminderAt || "").replace(" ", "T").slice(0, 16);
         taskFiles.value = [];
         taskSection.value = "tasks";
+        taskFormOpen.value = true;
       }
 
       function editUser(item) {
@@ -1765,6 +1867,7 @@
         userForm.shiftGroupId = String(item.shiftGroupId || "");
         userForm.password = "";
         taskSection.value = "users";
+        userFormOpen.value = true;
       }
 
       function editShift(item) {
@@ -1778,20 +1881,26 @@
       }
 
       async function submitHandover() {
+        if (!isTaskFormIdle()) return;
+        if (!validateHandoverForm()) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
         try {
-          await requestFormData(
+          const handoverPayload = { ...handoverForm };
+          delete handoverPayload.recordTime;
+          const responsePayload = await requestFormData(
             "/api/task-system/handover-records",
             {
-              ...handoverForm,
+              ...handoverPayload,
               shiftGroupId: handoverForm.shiftGroupId || null,
             },
             handoverFiles.value
           );
-          await fetchTaskSystem();
+          upsertTaskSystemItem("handovers", responsePayload.item);
           resetHandoverForm();
+          handoverFormOpen.value = false;
           setTaskActionMessage("交接班记录已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -1803,10 +1912,12 @@
       }
 
       async function submitTask() {
+        if (!isTaskFormIdle()) return;
+        if (!validateTaskForm()) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
         try {
-          await requestFormData(
+          const responsePayload = await requestFormData(
             "/api/task-system/tasks",
             {
               ...taskForm,
@@ -1814,9 +1925,11 @@
             },
             taskFiles.value
           );
-          await fetchTaskSystem();
+          upsertTaskSystemItem("tasks", responsePayload.item);
           resetTaskForm();
+          taskFormOpen.value = false;
           setTaskActionMessage("任务已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -1828,19 +1941,23 @@
       }
 
       async function submitUser() {
+        if (!isTaskFormIdle()) return;
+        if (!validateUserForm()) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
         try {
-          await requestJson("/api/task-system/users", {
+          const responsePayload = await requestJson("/api/task-system/users", {
             method: "POST",
             body: JSON.stringify({
               ...userForm,
               shiftGroupId: userForm.shiftGroupId || null,
             }),
           });
-          await fetchTaskSystem();
+          upsertTaskSystemItem("users", responsePayload.item);
           resetUserForm();
+          userFormOpen.value = false;
           setTaskActionMessage("用户信息已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -2045,22 +2162,30 @@
         }
       }
 
-      async function fetchTaskSystem() {
-        taskSystemLoading.value = true;
+      async function fetchTaskSystem(options = {}) {
+        const showLoading = options.showLoading !== false;
+        const resetForms = options.resetForms !== false;
+        if (showLoading) {
+          taskSystemLoading.value = true;
+        }
         taskSystemError.value = "";
         try {
           taskSystem.value = await requestJson("/api/task-system/bootstrap");
           syncSettingsForm();
-          resetHandoverForm();
-          resetTaskForm();
-          resetUserForm();
-          resetShiftForm();
+          if (resetForms) {
+            resetHandoverForm();
+            resetTaskForm();
+            resetUserForm();
+            resetShiftForm();
+          }
         } catch (errorInstance) {
           if (errorInstance instanceof Error && errorInstance.message === AUTH_REQUIRED_ERROR) return;
           taskSystemError.value =
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance);
         } finally {
-          taskSystemLoading.value = false;
+          if (showLoading) {
+            taskSystemLoading.value = false;
+          }
         }
       }
 
@@ -2768,6 +2893,9 @@
         taskActionSubmitting,
         taskActionMessage,
         taskActionTone,
+        handoverFormOpen,
+        taskFormOpen,
+        userFormOpen,
         pageConfig,
         currentRows,
         detailRows,
@@ -2851,6 +2979,12 @@
         editTask,
         editUser,
         editShift,
+        openHandoverForm,
+        closeHandoverForm,
+        openTaskForm,
+        closeTaskForm,
+        openUserForm,
+        closeUserForm,
         submitHandover,
         submitTask,
         submitUser,

@@ -212,7 +212,6 @@ def save_handover_record(
     record_payload = {
         "title": _normalize_text(payload.get("title")) or "交接班记录",
         "shift_group_id": _safe_int(payload.get("shiftGroupId")),
-        "record_time": _normalize_datetime_text(payload.get("recordTime")) or now,
         "handover_user": _resolve_person_name(payload.get("handoverUser")) or actor_profile["displayLabel"],
         "receiver_user": _resolve_person_name(payload.get("receiverUser")),
         "work_summary": _normalize_text(payload.get("workSummary")),
@@ -226,6 +225,8 @@ def save_handover_record(
 
     record_id = _safe_int(payload.get("id"))
     if record_id:
+        if not task_repository.fetch_handover_record(record_id):
+            raise ValueError("交接班记录不存在")
         task_repository.update_handover_record(
             record_id,
             {
@@ -236,6 +237,7 @@ def save_handover_record(
         record_id = task_repository.insert_handover_record(
             {
                 **record_payload,
+                "record_time": now,
                 "created_by": actor_username,
                 "created_at": now,
             }
