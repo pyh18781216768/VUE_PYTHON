@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request, send_file
 from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.services.task_export_service import export_task_data
 from fab_app.services.task_system_service import (
+    assign_user_permission,
     claim_task,
     delete_department,
     delete_floor,
@@ -54,6 +55,18 @@ def admin_required(view_func):
     return wrapped
 
 
+def super_admin_required(view_func):
+    @wraps(view_func)
+    @login_required
+    def wrapped(*args, **kwargs):
+        profile = get_user_summary(current_username())
+        if profile.get("role") != "admin":
+            return jsonify({"message": "只有超级管理员可以执行该操作。"}), 403
+        return view_func(*args, **kwargs)
+
+    return wrapped
+
+
 @task_blueprint.get("/api/task-system/bootstrap")
 @login_required
 def task_system_bootstrap():
@@ -72,6 +85,17 @@ def save_task_user():
     payload = request.get_json(silent=True) or {}
     try:
         item = save_user(payload, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.post("/api/task-system/users/<path:username>/permission")
+@super_admin_required
+def assign_task_user_permission(username: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = assign_user_permission(username, payload.get("role"), current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"item": item})

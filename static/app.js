@@ -1003,6 +1003,12 @@
         role: "user",
         password: "",
       });
+      const permissionForm = reactive({
+        username: "",
+        displayLabel: "",
+        currentRole: "user",
+        role: "user",
+      });
       const shiftForm = reactive({
         id: "",
         name: "",
@@ -1034,6 +1040,7 @@
       const detailDialogType = ref("");
       const detailDialogRecord = ref(null);
       const userFormOpen = ref(false);
+      const permissionFormOpen = ref(false);
       const shiftFormOpen = ref(false);
       const floorFormOpen = ref(false);
       const departmentFormOpen = ref(false);
@@ -1045,6 +1052,7 @@
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
       const isAdmin = computed(() => Number(authUser.value.permissionLevel || 1) >= 5);
+      const isSuperAdmin = computed(() => authUser.value.role === "admin");
       const activeSystemLoading = computed(() =>
         systemMode.value === "tasks" ? taskSystemLoading.value : loading.value
       );
@@ -2030,6 +2038,28 @@
         userFormOpen.value = false;
       }
 
+      function resetPermissionForm() {
+        permissionForm.username = "";
+        permissionForm.displayLabel = "";
+        permissionForm.currentRole = "user";
+        permissionForm.role = "user";
+      }
+
+      function openPermissionForm(item) {
+        resetPermissionForm();
+        setTaskActionMessage("", "error");
+        permissionForm.username = item.username || "";
+        permissionForm.displayLabel = item.displayLabel || item.displayName || item.username || "";
+        permissionForm.currentRole = item.role || "user";
+        permissionForm.role = item.role || "user";
+        permissionFormOpen.value = true;
+      }
+
+      function closePermissionForm() {
+        resetPermissionForm();
+        permissionFormOpen.value = false;
+      }
+
       function getRoleLabel(role) {
         const option = roleSelectOptions.find((item) => item.value === role);
         return option?.label || "普通用户";
@@ -2871,6 +2901,33 @@
           resetUserForm();
           userFormOpen.value = false;
           setTaskActionMessage("用户信息已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function submitPermission() {
+        if (!isTaskFormIdle()) return;
+        if (!permissionForm.username) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson(
+            `/api/task-system/users/${encodeURIComponent(permissionForm.username)}/permission`,
+            {
+              method: "POST",
+              body: JSON.stringify({ role: permissionForm.role }),
+            }
+          );
+          upsertTaskSystemItem("users", responsePayload.item);
+          closePermissionForm();
+          setTaskActionMessage("用户权限已更新。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -4174,6 +4231,7 @@
         taskForm,
         taskRejectForm,
         userForm,
+        permissionForm,
         shiftForm,
         floorForm,
         departmentForm,
@@ -4186,6 +4244,7 @@
         taskFormOpen,
         taskRejectDialogOpen,
         userFormOpen,
+        permissionFormOpen,
         shiftFormOpen,
         floorFormOpen,
         departmentFormOpen,
@@ -4201,6 +4260,7 @@
         detailModeOptions,
         usesTimelineDetail,
         isAdmin,
+        isSuperAdmin,
         shiftOptions,
         floorOptions,
         departmentOptions,
@@ -4322,6 +4382,8 @@
         deleteCurrentHandover,
         deleteCurrentTask,
         editUser,
+        openPermissionForm,
+        closePermissionForm,
         openHandoverForm,
         closeHandoverForm,
         openTaskForm,
@@ -4337,6 +4399,7 @@
         submitHandover,
         submitTask,
         submitUser,
+        submitPermission,
         submitShift,
         submitFloor,
         submitDepartment,

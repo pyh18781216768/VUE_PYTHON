@@ -92,7 +92,12 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
 
     existing = user_repository.fetch_user(username)
     is_update = bool(existing)
-    role = _normalize_role(payload.get("role"))
+    requested_role = _normalize_role(payload.get("role"))
+    actor_is_super_admin = _actor_is_super_admin(actor_username)
+    role = requested_role if actor_is_super_admin else "user"
+    if existing:
+        existing_role = _normalize_role(existing["role"])
+        role = requested_role if actor_is_super_admin else existing_role
     user_payload = {
         "display_name": _normalize_text(payload.get("displayName")),
         "department": _normalize_text(payload.get("department")),
@@ -134,6 +139,44 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
         "用户管理",
         "修改" if is_update else "增加",
         _user_operation_label(item),
+        item["id"],
+    )
+    return item
+
+
+def assign_user_permission(
+    target_username: str,
+    role: str,
+    actor_username: str,
+) -> dict[str, Any]:
+    if not _actor_is_super_admin(actor_username):
+        raise ValueError("只有超级管理员可以赋予用户权限")
+
+    username = _normalize_text(target_username)
+    if not username:
+        raise ValueError("工号不能为空")
+
+    existing = user_repository.fetch_user(username)
+    if not existing:
+        raise ValueError("用户不存在")
+
+    normalized_role = _normalize_role(role)
+    if username == _normalize_text(actor_username) and normalized_role != "admin":
+        raise ValueError("不能降低当前超级管理员自己的权限")
+
+    user_repository.update_user_by_username(
+        username,
+        {
+            "role": normalized_role,
+            "updated_at": _now_text(),
+        },
+    )
+    item = get_user_summary(username)
+    _safe_record_operation(
+        actor_username,
+        "用户管理",
+        "修改",
+        f"权限赋予 / {_user_operation_label(item)} / {item['role']}",
         item["id"],
     )
     return item
@@ -1191,6 +1234,14 @@ def _actor_has_level5(actor_username: str) -> bool:
     except KeyError:
         return False
     return int(actor_profile.get("permissionLevel") or 1) >= 5
+
+
+def _actor_is_super_admin(actor_username: str) -> bool:
+    try:
+        actor_profile = get_user_summary(actor_username)
+    except KeyError:
+        return False
+    return _normalize_role(actor_profile.get("role")) == "admin"
 
 
 def _is_actor_task_assignee(task_row, actor_username: str) -> bool:

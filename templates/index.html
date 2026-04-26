@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260426-31" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260426-32" />
   </head>
   <body>
     {% raw %}
@@ -732,7 +732,7 @@
                 <div class="section-head">
                   <div>
                     <h2>用户管理</h2>
-                    <p>可创建账号并设置职位；除普通用户外均为 5 级权限。</p>
+                    <p>可创建账号；只有超级管理员可以设置或调整职位权限。</p>
                   </div>
                   <button class="btn-ghost" type="button" @click="closeUserForm">关闭</button>
                 </div>
@@ -745,9 +745,13 @@
                     <span>姓名</span>
                     <input v-model.trim="userForm.displayName" type="text" placeholder="显示名称" />
                   </label>
-                  <label>
+                  <label v-if="isSuperAdmin">
                     <span>职位</span>
                     <searchable-select v-model="userForm.role" :options="roleSelectOptions" :allow-empty="false"></searchable-select>
+                  </label>
+                  <label v-else>
+                    <span>职位</span>
+                    <input :value="getRoleLabel(userForm.role)" type="text" readonly title="只有超级管理员可以赋予权限" />
                   </label>
                   <label>
                     <span>邮箱</span>
@@ -774,6 +778,46 @@
                   </div>
                 </form>
               </article>
+                </div>
+              </teleport>
+
+              <teleport to="body">
+                <div v-if="permissionFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>赋予用户权限</h2>
+                        <p>仅超级管理员可调整用户职位与权限等级。</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closePermissionForm">关闭</button>
+                    </div>
+                    <form class="task-form-grid settings-form-grid" @submit.prevent="submitPermission">
+                      <label>
+                        <span>工号</span>
+                        <input :value="permissionForm.username" type="text" readonly />
+                      </label>
+                      <label>
+                        <span>姓名</span>
+                        <input :value="permissionForm.displayLabel" type="text" readonly />
+                      </label>
+                      <label>
+                        <span>当前权限</span>
+                        <input :value="getRoleLabel(permissionForm.currentRole)" type="text" readonly />
+                      </label>
+                      <label>
+                        <span>赋予权限</span>
+                        <searchable-select v-model="permissionForm.role" :options="roleSelectOptions" :allow-empty="false"></searchable-select>
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="closePermissionForm">取消</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存权限' }}</button>
+                      </div>
+                    </form>
+                  </article>
                 </div>
               </teleport>
 
@@ -842,7 +886,12 @@
                         <td>{{ getRoleLabel(item.role) }}</td>
                         <td>{{ formatDateTime(item.createdAt) }}</td>
                         <td>{{ formatDateTime(item.updatedAt) }}</td>
-                        <td @dblclick.stop><button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button></td>
+                        <td @dblclick.stop>
+                          <div class="task-action-buttons">
+                            <button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button>
+                            <button v-if="isSuperAdmin" class="btn-secondary table-action" type="button" @click="openPermissionForm(item)">权限</button>
+                          </div>
+                        </td>
                       </tr>
                       <tr v-if="!filteredTaskUsers.length">
                         <td colspan="7" class="empty-cell">当前条件下没有用户数据</td>
@@ -1718,6 +1767,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260426-31"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260426-32"></script>
   </body>
 </html>
