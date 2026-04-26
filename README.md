@@ -84,3 +84,15 @@ Notes:
 
 - Frontend assets are bundled locally in `static/vendor`
 - Excel is still used only as an export format, not as the dashboard data source
+
+## Maintenance
+
+- Project map: `docs/PROJECT_MAINTENANCE_MAP.md`
+- API and data map: `docs/API_AND_DATA_MAP.md`
+- Frontend section map: `docs/FRONTEND_SECTION_MAP.md`
+- Request guide: `docs/REQUEST_GUIDE.md`
+- Local check script: `scripts/check_project.ps1`
+- UTF-8 check script: `scripts/check_utf8.ps1`
+- Local restart script: `scripts/restart_dev_server.ps1`
+
+Use the maintenance map before changing a feature so each request can be scoped to the right frontend section, backend controller/service/repository, and export path without touching unrelated pages.

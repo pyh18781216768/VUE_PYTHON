@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260425-28" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260426-31" />
   </head>
   <body>
     {% raw %}
@@ -84,6 +84,10 @@
               <span>Admin</span>
               <strong>用户管理</strong>
             </button>
+            <button v-if="isAdmin" :class="{ active: taskSection === 'operations' }" @click="taskSection = 'operations'; navDrawerOpen = false">
+              <span>Log</span>
+              <strong>操作记录</strong>
+            </button>
             <button v-if="isAdmin" :class="{ active: taskSection === 'settings' }" @click="taskSection = 'settings'; navDrawerOpen = false">
               <span>Setup</span>
               <strong>系统设置</strong>
@@ -115,6 +119,48 @@
             </small>
           </div>
           <div class="topbar-actions">
+            <div v-if="systemMode === 'tasks'" class="notification-bell-wrap">
+              <button
+                class="notification-bell"
+                type="button"
+                :class="{ active: notificationPanelOpen, 'has-unread': unreadNotificationCount > 0 }"
+                aria-label="通知提醒"
+                @click="toggleNotificationPanel"
+              >
+                <span class="notification-bell-icon">🔔</span>
+                <span v-if="unreadNotificationCount > 0" class="notification-badge">{{ unreadNotificationCount }}</span>
+              </button>
+              <teleport to="body">
+                <div
+                  v-if="isAuthenticated && systemMode === 'tasks' && notificationPanelOpen"
+                  class="notification-popover-layer"
+                >
+                  <section class="notification-panel card">
+                    <div class="notification-panel-head">
+                      <strong>通知提醒</strong>
+                      <div class="notification-panel-meta">
+                        <small>{{ unreadNotificationCount > 0 ? `未读 ${unreadNotificationCount} 条` : '暂无未读' }}</small>
+                        <button class="notification-close" type="button" @click="closeNotificationPanel">关闭</button>
+                      </div>
+                    </div>
+                    <div v-if="!notificationItems.length" class="notification-empty">当前没有未读提醒。</div>
+                    <button
+                      v-for="item in notificationItems"
+                      :key="item.id"
+                      type="button"
+                      :class="['notification-item', { unread: item.unread }]"
+                      title="单击标记已读，双击查看详情"
+                      @click="handleNotificationClick(item)"
+                      @dblclick.prevent="openNotificationDetail(item)"
+                    >
+                      <span class="notification-type">{{ item.typeLabel }}</span>
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ item.description }}</small>
+                    </button>
+                  </section>
+                </div>
+              </teleport>
+            </div>
             <button v-if="systemMode === 'dashboard'" class="btn-primary" @click="openExportDialog">Excel 导出</button>
             <button class="btn-secondary" @click="refreshActivePage">刷新</button>
             <button class="btn-secondary" @click="openProfileDialog">个人信息</button>
@@ -141,33 +187,6 @@
               <p class="hero-copy">登录后默认进入任务系统，统一处理交接班、任务、提醒、统计和导出。</p>
             </div>
           </header>
-
-          <section class="card task-reminder-card">
-            <div class="section-head">
-              <div>
-                <h2>通知提醒</h2>
-                <p>包含交接班时间提醒与任务到期提醒。</p>
-              </div>
-            </div>
-            <div class="task-reminder-grid">
-              <article class="reminder-block">
-                <h3>班次提醒</h3>
-                <p v-if="!taskSystem.reminders.shiftReminders.length" class="muted-line">当前没有即将到来的交接班提醒。</p>
-                <div v-for="item in taskSystem.reminders.shiftReminders" :key="item.shiftName + item.startTime" class="reminder-item">
-                  <strong>{{ item.shiftName }}</strong>
-                  <span>{{ formatDateTime(item.startTime) }}，剩余 {{ item.minutesUntil }} 分钟</span>
-                </div>
-              </article>
-              <article class="reminder-block">
-                <h3>任务提醒</h3>
-                <p v-if="!taskSystem.reminders.dueTasks.length" class="muted-line">当前没有即将到期的任务。</p>
-                <div v-for="item in taskSystem.reminders.dueTasks" :key="item.id" class="reminder-item">
-                  <strong>{{ item.title }}</strong>
-                  <span>{{ item.assigneeUser || '未分配' }} / {{ formatDateTime(item.dueAt) }}</span>
-                </div>
-              </article>
-            </div>
-          </section>
 
           <p v-if="taskActionMessage" :class="['form-feedback', taskActionTone === 'success' ? 'form-success' : 'form-error']">
             {{ taskActionMessage }}
@@ -242,6 +261,14 @@
                     <span>接班人</span>
                     <searchable-select v-model="handoverForm.receiverUser" :options="userSelectOptions" empty-label="请选择"></searchable-select>
                   </label>
+                  <label class="form-span-2">
+                    <span>@人员</span>
+                    <multi-searchable-select
+                      v-model="handoverForm.mentionUsers"
+                      :options="mentionUserSelectOptions"
+                      placeholder="搜索并选择需要 @ 的人员，可多选"
+                    ></multi-searchable-select>
+                  </label>
                   <label>
                     <span>关键词</span>
                     <input v-model.trim="handoverForm.keywords" type="text" placeholder="工单、设备、风险点" />
@@ -266,7 +293,8 @@
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button class="btn-secondary" type="button" @click="resetHandoverForm">重置</button>
+                    <button v-if="handoverForm.id" class="btn-ghost" type="button" @click="deleteCurrentHandover">删除</button>
+                    <button v-else class="btn-secondary" type="button" @click="resetHandoverForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存交接记录' }}</button>
                   </div>
                 </form>
@@ -300,8 +328,14 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('shiftName', $event)">
-                            <strong>班次</strong>
+                            <strong>交班班次</strong>
                             <span>{{ getHandoverSortIndicator('shiftName') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('receiverShiftName', $event)">
+                            <strong>接班班次</strong>
+                            <span>{{ getHandoverSortIndicator('receiverShiftName') }}</span>
                           </button>
                         </th>
                         <th>
@@ -335,6 +369,12 @@
                           </button>
                         </th>
                         <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('mentionUserLabels', $event)">
+                            <strong>@人员</strong>
+                            <span>{{ getHandoverSortIndicator('mentionUserLabels') }}</span>
+                          </button>
+                        </th>
+                        <th>
                           <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('pendingItems', $event)">
                             <strong>未完成事项</strong>
                             <span>{{ getHandoverSortIndicator('pendingItems') }}</span>
@@ -345,24 +385,44 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="item in filteredTaskHandovers" :key="item.id">
+                      <tr
+                        v-for="item in filteredTaskHandovers"
+                        :key="item.id"
+                        class="detail-enabled-row"
+                        title="双击查看详情"
+                        @dblclick="openHandoverDetail(item)"
+                      >
                         <td>{{ item.id }}</td>
                         <td :title="item.keywords">{{ item.keywords || '--' }}</td>
                         <td>{{ item.shiftName }}</td>
+                        <td>{{ item.receiverShiftName }}</td>
                         <td>{{ item.floorName }}</td>
                         <td>{{ formatDateTime(item.createdAt || item.recordTime) }}</td>
                         <td>{{ item.handoverUser }}</td>
                         <td>{{ item.receiverUser }}</td>
                         <td>{{ item.receiverSupervisorLabel || '--' }}</td>
+                        <td :title="item.mentionUserLabels">{{ item.mentionUserLabels || '--' }}</td>
                         <td :title="item.pendingItems">{{ item.pendingItems || '--' }}</td>
-                        <td>
-                          <a v-for="file in item.attachments" :key="file.id" :href="file.downloadUrl" class="attachment-link">{{ file.originalName }}</a>
+                        <td @dblclick.stop>
+                          <div v-for="file in item.attachments" :key="file.id" class="attachment-item">
+                            <button
+                              v-if="isImageAttachment(file)"
+                              class="attachment-image-button"
+                              type="button"
+                              :title="`点击放大：${file.originalName}`"
+                              @click="openAttachmentPreview(file)"
+                            >
+                              <img :src="file.previewUrl || file.downloadUrl" :alt="file.originalName" />
+                            </button>
+                            <span v-else class="attachment-file-name">{{ file.originalName }}</span>
+                            <a :href="file.downloadUrl" class="attachment-download-link" download>下载</a>
+                          </div>
                           <span v-if="!item.attachments.length">--</span>
                         </td>
-                        <td><button class="btn-ghost table-action" type="button" @click="editHandover(item)">编辑</button></td>
+                        <td @dblclick.stop><button class="btn-ghost table-action" type="button" @click="editHandover(item)">编辑</button></td>
                       </tr>
                       <tr v-if="!filteredTaskHandovers.length">
-                        <td colspan="11" class="empty-cell">当前条件下没有交接班记录</td>
+                        <td colspan="13" class="empty-cell">当前条件下没有交接班记录</td>
                       </tr>
                     </tbody>
                   </table>
@@ -418,7 +478,7 @@
                   </label>
                   <label>
                     <span>状态</span>
-                    <searchable-select v-model="taskForm.status" :options="statusSelectOptions" :allow-empty="false"></searchable-select>
+                    <searchable-select v-model="taskForm.status" :options="taskFormStatusSelectOptions" :allow-empty="false"></searchable-select>
                   </label>
                   <label>
                     <span>优先级</span>
@@ -427,6 +487,14 @@
                   <label>
                     <span>负责人</span>
                     <searchable-select v-model="taskForm.assigneeUser" :options="userSelectOptions" empty-label="未分配"></searchable-select>
+                  </label>
+                  <label class="form-span-2">
+                    <span>@人员</span>
+                    <multi-searchable-select
+                      v-model="taskForm.mentionUsers"
+                      :options="mentionUserSelectOptions"
+                      placeholder="搜索并选择需要 @ 的人员，可多选"
+                    ></multi-searchable-select>
                   </label>
                   <label>
                     <span>开始时间</span>
@@ -452,11 +520,40 @@
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button class="btn-secondary" type="button" @click="resetTaskForm">重置</button>
+                    <button v-if="taskForm.id" class="btn-ghost" type="button" @click="deleteCurrentTask">删除</button>
+                    <button v-else class="btn-secondary" type="button" @click="resetTaskForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存任务' }}</button>
                   </div>
                 </form>
               </article>
+                </div>
+              </teleport>
+
+              <teleport to="body">
+                <div v-if="taskRejectDialogOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>驳回任务</h2>
+                        <p>{{ taskRejectForm.title || '请填写驳回理由' }}</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closeTaskRejectDialog">关闭</button>
+                    </div>
+                    <form class="task-form-grid" @submit.prevent="submitTaskReject">
+                      <label class="form-span-2">
+                        <span>驳回理由</span>
+                        <textarea v-model.trim="taskRejectForm.reason" rows="5" placeholder="请输入驳回原因、需要补充的信息或处理建议"></textarea>
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="closeTaskRejectDialog">取消</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '驳回中...' : '确认驳回' }}</button>
+                      </div>
+                    </form>
+                  </article>
                 </div>
               </teleport>
 
@@ -532,30 +629,72 @@
                             <span>{{ getTaskSortIndicator('supervisorLabel') }}</span>
                           </button>
                         </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('mentionUserLabels', $event)">
+                            <strong>@人员</strong>
+                            <span>{{ getTaskSortIndicator('mentionUserLabels') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('rejectReason', $event)">
+                            <strong>驳回理由</strong>
+                            <span>{{ getTaskSortIndicator('rejectReason') }}</span>
+                          </button>
+                        </th>
                         <th>附件</th>
                         <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="item in filteredTaskItems" :key="item.id">
+                      <tr
+                        v-for="item in filteredTaskItems"
+                        :key="item.id"
+                        class="detail-enabled-row"
+                        title="双击查看详情"
+                        @dblclick="openTaskDetail(item)"
+                      >
                         <td>{{ item.id }}</td>
                         <td :title="item.description">{{ item.title }}</td>
-                        <td>{{ item.status }}</td>
-                        <td>{{ item.priority }}</td>
+                        <td>
+                          <span :class="['task-color-box', getTaskStatusBoxClass(item.status)]">{{ item.status }}</span>
+                        </td>
+                        <td>
+                          <span :class="['task-color-box', getTaskPriorityBoxClass(item.priority)]">{{ item.priority }}</span>
+                        </td>
                         <td>{{ item.assigneeUser || '--' }}</td>
                         <td>{{ formatDateTime(item.createdAt) }}</td>
                         <td>{{ formatDateTime(item.startAt) }}</td>
                         <td>{{ formatDateTime(item.dueAt) }}</td>
                         <td :title="getHandoverRecordLabel(item.handoverRecordId)">{{ getHandoverRecordLabel(item.handoverRecordId) }}</td>
                         <td>{{ item.supervisorLabel || '--' }}</td>
-                        <td>
-                          <a v-for="file in item.attachments" :key="file.id" :href="file.downloadUrl" class="attachment-link">{{ file.originalName }}</a>
+                        <td :title="item.mentionUserLabels">{{ item.mentionUserLabels || '--' }}</td>
+                        <td :title="item.rejectReason">{{ item.rejectReason || '--' }}</td>
+                        <td @dblclick.stop>
+                          <div v-for="file in item.attachments" :key="file.id" class="attachment-item">
+                            <button
+                              v-if="isImageAttachment(file)"
+                              class="attachment-image-button"
+                              type="button"
+                              :title="`点击放大：${file.originalName}`"
+                              @click="openAttachmentPreview(file)"
+                            >
+                              <img :src="file.previewUrl || file.downloadUrl" :alt="file.originalName" />
+                            </button>
+                            <span v-else class="attachment-file-name">{{ file.originalName }}</span>
+                            <a :href="file.downloadUrl" class="attachment-download-link" download>下载</a>
+                          </div>
                           <span v-if="!item.attachments.length">--</span>
                         </td>
-                        <td><button class="btn-ghost table-action" type="button" @click="editTask(item)">编辑</button></td>
+                        <td @dblclick.stop>
+                          <div class="task-action-buttons">
+                            <button v-if="canClaimTask(item)" class="btn-secondary table-action" type="button" @click="claimTask(item)">领取</button>
+                            <button v-if="canRejectTask(item)" class="btn-ghost table-action" type="button" @click="openTaskRejectDialog(item)">驳回</button>
+                            <button v-if="canEditTask(item)" class="btn-ghost table-action" type="button" @click="editTask(item)">编辑</button>
+                          </div>
+                        </td>
                       </tr>
                       <tr v-if="!filteredTaskItems.length">
-                        <td colspan="12" class="empty-cell">当前条件下没有任务数据</td>
+                        <td colspan="14" class="empty-cell">当前条件下没有任务数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -589,7 +728,7 @@
               <teleport to="body">
                 <div v-if="userFormOpen" class="modal-layer">
                   <div class="modal-backdrop" aria-hidden="true"></div>
-                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                  <article class="task-entry-dialog user-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
                     <h2>用户管理</h2>
@@ -597,7 +736,7 @@
                   </div>
                   <button class="btn-ghost" type="button" @click="closeUserForm">关闭</button>
                 </div>
-                <form class="task-form-grid" @submit.prevent="submitUser">
+                <form class="task-form-grid user-form-grid" @submit.prevent="submitUser">
                   <label>
                     <span>工号</span>
                     <input v-model.trim="userForm.username" type="text" placeholder="输入工号" />
@@ -620,7 +759,7 @@
                   </label>
                   <label>
                     <span>部门</span>
-                    <input v-model.trim="userForm.department" type="text" name="new-user-department" autocomplete="off" />
+                    <searchable-select v-model="userForm.department" :options="departmentSelectOptions" empty-label="请选择"></searchable-select>
                   </label>
                   <label>
                     <span>密码</span>
@@ -690,17 +829,121 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="item in filteredTaskUsers" :key="item.username + '-list'">
+                      <tr
+                        v-for="item in filteredTaskUsers"
+                        :key="item.username + '-list'"
+                        class="detail-enabled-row"
+                        title="双击查看详情"
+                        @dblclick="openUserDetail(item)"
+                      >
                         <td>{{ item.id }}</td>
                         <td>{{ item.username }}</td>
                         <td>{{ item.displayLabel }}</td>
                         <td>{{ getRoleLabel(item.role) }}</td>
                         <td>{{ formatDateTime(item.createdAt) }}</td>
                         <td>{{ formatDateTime(item.updatedAt) }}</td>
-                        <td><button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button></td>
+                        <td @dblclick.stop><button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button></td>
                       </tr>
                       <tr v-if="!filteredTaskUsers.length">
                         <td colspan="7" class="empty-cell">当前条件下没有用户数据</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+          </template>
+
+          <template v-else-if="taskSection === 'operations' && isAdmin">
+            <section class="filters card">
+              <div class="section-head">
+                <div>
+                  <h2>操作记录查询</h2>
+                  <p>记录任务系统内增加、修改、删除、查看四类操作，支持按人、时间段和操作功能筛选。</p>
+                </div>
+                <button class="btn-secondary" type="button" @click="resetOperationSort">重置排序</button>
+              </div>
+              <div class="task-filter-grid">
+                <label>
+                  <span>操作人</span>
+                  <input v-model.trim="operationFilters.operator" type="text" placeholder="搜索工号或姓名" />
+                </label>
+                <label>
+                  <span>开始日期</span>
+                  <input v-model="operationFilters.dateFrom" type="date" />
+                </label>
+                <label>
+                  <span>结束日期</span>
+                  <input v-model="operationFilters.dateTo" type="date" />
+                </label>
+                <label>
+                  <span>操作功能</span>
+                  <searchable-select v-model="operationFilters.actionType" :options="operationActionSelectOptions" empty-label="全部"></searchable-select>
+                </label>
+              </div>
+            </section>
+
+            <section class="task-layout task-layout-list-only">
+              <article class="card task-table-card">
+                <div class="section-head">
+                  <div>
+                    <h2>操作记录列表</h2>
+                    <p>默认按操作时间倒序排列；点击表头排序，按住 Shift 可叠加多重排序。</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('id', $event)">
+                            <strong>ID</strong>
+                            <span>{{ getOperationSortIndicator('id') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('operatorLabel', $event)">
+                            <strong>操作人</strong>
+                            <span>{{ getOperationSortIndicator('operatorLabel') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('operatedAt', $event)">
+                            <strong>操作时间</strong>
+                            <span>{{ getOperationSortIndicator('operatedAt') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('pageName', $event)">
+                            <strong>操作页面</strong>
+                            <span>{{ getOperationSortIndicator('pageName') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('actionType', $event)">
+                            <strong>操作功能</strong>
+                            <span>{{ getOperationSortIndicator('actionType') }}</span>
+                          </button>
+                        </th>
+                        <th>
+                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('recordLabel', $event)">
+                            <strong>操作了哪条记录</strong>
+                            <span>{{ getOperationSortIndicator('recordLabel') }}</span>
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in filteredOperationLogs" :key="item.id + '-operation'">
+                        <td>{{ item.id }}</td>
+                        <td :title="item.operatorUser">{{ item.operatorLabel || item.operatorUser || '--' }}</td>
+                        <td>{{ formatDateTime(item.operatedAt) }}</td>
+                        <td>{{ item.pageName }}</td>
+                        <td>{{ item.actionType }}</td>
+                        <td :title="item.recordLabel">{{ item.recordLabel || item.recordId || '--' }}</td>
+                      </tr>
+                      <tr v-if="!filteredOperationLogs.length">
+                        <td colspan="6" class="empty-cell">当前条件下没有操作记录。</td>
                       </tr>
                     </tbody>
                   </table>
@@ -730,7 +973,7 @@
               <teleport to="body">
                 <div v-if="shiftFormOpen" class="modal-layer">
                   <div class="modal-backdrop" aria-hidden="true"></div>
-                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                  <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
                         <h2>新增班次</h2>
@@ -738,7 +981,7 @@
                       </div>
                       <button class="btn-ghost" type="button" @click="closeShiftForm">关闭</button>
                     </div>
-                    <form class="task-form-grid" @submit.prevent="submitShift">
+                    <form class="task-form-grid settings-form-grid" @submit.prevent="submitShift">
                       <label>
                         <span>班次名称</span>
                         <input v-model.trim="shiftForm.name" type="text" />
@@ -820,7 +1063,7 @@
               <teleport to="body">
                 <div v-if="floorFormOpen" class="modal-layer">
                   <div class="modal-backdrop" aria-hidden="true"></div>
-                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                  <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
                         <h2>新增楼层</h2>
@@ -828,7 +1071,7 @@
                       </div>
                       <button class="btn-ghost" type="button" @click="closeFloorForm">关闭</button>
                     </div>
-                    <form class="task-form-grid" @submit.prevent="submitFloor">
+                    <form class="task-form-grid settings-form-grid" @submit.prevent="submitFloor">
                       <label>
                         <span>楼层名称</span>
                         <input v-model.trim="floorForm.name" type="text" placeholder="例如：1F / 二楼 / A栋3层" />
@@ -875,6 +1118,86 @@
                       </tr>
                       <tr v-if="!filteredFloorOptions.length">
                         <td colspan="4" class="empty-cell">当前条件下没有楼层数据</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <section class="filters card">
+                <div class="section-head">
+                  <div>
+                    <h2>部门查询</h2>
+                    <p>维护新增用户时可选择的部门。</p>
+                  </div>
+                  <button class="btn-secondary" type="button" @click="openDepartmentForm">新增</button>
+                </div>
+                <div class="task-filter-grid">
+                  <label>
+                    <span>关键词</span>
+                    <input v-model.trim="departmentFilters.keyword" type="text" placeholder="搜索部门名称、排序" />
+                  </label>
+                </div>
+              </section>
+
+              <teleport to="body">
+                <div v-if="departmentFormOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>新增部门</h2>
+                        <p>用于新增或编辑用户时选择部门。</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closeDepartmentForm">关闭</button>
+                    </div>
+                    <form class="task-form-grid settings-form-grid" @submit.prevent="submitDepartment">
+                      <label>
+                        <span>部门名称</span>
+                        <input v-model.trim="departmentForm.name" type="text" placeholder="例如：AA PE / 设备维护" />
+                      </label>
+                      <label>
+                        <span>排序</span>
+                        <input v-model.number="departmentForm.sortOrder" type="number" />
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="resetDepartmentForm">重置</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存部门' }}</button>
+                      </div>
+                    </form>
+                  </article>
+                </div>
+              </teleport>
+
+              <article class="card task-table-card">
+                <div class="section-head">
+                  <div>
+                    <h2>部门列表</h2>
+                    <p>部门用于用户新增和编辑时选择，列表内可删除不再需要的部门。</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>部门</th>
+                        <th>排序</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in filteredDepartmentOptions" :key="item.id + '-department'">
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.sortOrder }}</td>
+                        <td>{{ formatDateTime(item.createdAt) }}</td>
+                        <td><button class="btn-ghost table-action" type="button" @click="deleteDepartment(item)">删除</button></td>
+                      </tr>
+                      <tr v-if="!filteredDepartmentOptions.length">
+                        <td colspan="4" class="empty-cell">当前条件下没有部门数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1316,12 +1639,85 @@
             </div>
           </section>
         </div>
+
+        <div v-if="detailDialogOpen && detailDialogRecord" class="modal-layer" @click.self="closeDetailDialog">
+          <div class="modal-backdrop"></div>
+          <section class="detail-dialog card" @click.stop>
+            <div class="section-head">
+              <div>
+                <h2>{{ detailDialogTitle }}</h2>
+                <p>{{ detailDialogSubtitle || '双击表格行打开的只读详情。' }}</p>
+              </div>
+              <button class="btn-ghost" type="button" @click="closeDetailDialog">关闭</button>
+            </div>
+
+            <div class="detail-dialog-body">
+              <section v-for="section in detailDialogSections" :key="section.title" class="detail-section">
+                <h3>{{ section.title }}</h3>
+                <div class="record-detail-grid">
+                  <div
+                    v-for="field in section.fields"
+                    :key="`${section.title}-${field.label}`"
+                    :class="['detail-field', { 'detail-field-wide': field.long }]"
+                  >
+                    <span>{{ field.label }}</span>
+                    <p :class="{ 'detail-value-long': field.long }">{{ field.value || '--' }}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section
+                v-if="detailDialogRecord.attachments && detailDialogRecord.attachments.length"
+                class="detail-section"
+              >
+                <h3>附件</h3>
+                <div class="detail-attachment-list">
+                  <div v-for="file in detailDialogRecord.attachments" :key="file.id" class="attachment-item">
+                    <button
+                      v-if="isImageAttachment(file)"
+                      class="attachment-image-button"
+                      type="button"
+                      :title="`点击放大：${file.originalName}`"
+                      @click="openAttachmentPreview(file)"
+                    >
+                      <img :src="file.previewUrl || file.downloadUrl" :alt="file.originalName" />
+                    </button>
+                    <span v-else class="attachment-file-name">{{ file.originalName }}</span>
+                    <a :href="file.downloadUrl" class="attachment-download-link" download>下载</a>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <div v-if="attachmentPreviewOpen && attachmentPreviewFile" class="modal-layer" @click.self="closeAttachmentPreview">
+          <div class="modal-backdrop"></div>
+          <section class="attachment-preview-dialog card">
+            <div class="section-head">
+              <div>
+                <h2>图片预览</h2>
+                <p>{{ attachmentPreviewFile.originalName }}</p>
+              </div>
+              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">关闭</button>
+            </div>
+            <img
+              class="attachment-preview-image"
+              :src="attachmentPreviewFile.previewUrl || attachmentPreviewFile.downloadUrl"
+              :alt="attachmentPreviewFile.originalName"
+            />
+            <div class="profile-actions">
+              <a :href="attachmentPreviewFile.downloadUrl" class="btn-secondary attachment-preview-download" download>下载</a>
+              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">关闭预览</button>
+            </div>
+          </section>
+        </div>
       </teleport>
     </div>
     {% endraw %}
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260425-28"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260426-31"></script>
   </body>
 </html>

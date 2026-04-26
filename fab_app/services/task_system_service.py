@@ -24,8 +24,9 @@ DEFAULT_SETTINGS = {
     "permissions.assign_admin": True,
 }
 
-TASK_STATUSES = ("未开始", "进行中", "已完成")
+TASK_STATUSES = ("未开始", "进行中", "已完成", "已驳回")
 TASK_PRIORITIES = ("低", "中", "高")
+OPERATION_ACTIONS = ("增加", "修改", "删除", "查看")
 UPLOAD_ROOT = BASE_DIR / "storage" / "uploads"
 ROLE_PERMISSION_LEVELS = {
     "user": 1,
@@ -46,21 +47,27 @@ ROLE_ALIASES = {
 def ensure_task_system_store() -> None:
     task_repository.ensure_task_tables()
     _seed_shift_groups()
+    _seed_departments()
     _seed_settings()
 
 
 def get_task_system_payload(username: str) -> dict[str, Any]:
     user_profile = get_user_summary(username)
+    handovers = list_handover_records({})
+    tasks = list_tasks({}, handovers=handovers)
     return {
         "currentUser": user_profile,
         "users": list_users(),
         "shifts": list_shift_groups(),
         "floors": list_floors(),
+        "departments": list_departments(),
         "settings": get_system_settings(),
-        "handovers": list_handover_records({}),
-        "tasks": list_tasks({}),
-        "reports": get_report_summary(),
-        "reminders": get_reminders(),
+        "handovers": handovers,
+        "tasks": tasks,
+        "reports": get_report_summary(handovers, tasks),
+        "reminders": get_reminders(username, tasks, handovers),
+        "operationLogs": list_operation_logs({}) if int(user_profile.get("permissionLevel") or 1) >= 5 else [],
+        "operationActions": list(OPERATION_ACTIONS),
         "statusOptions": list(TASK_STATUSES),
         "priorityOptions": list(TASK_PRIORITIES),
     }
@@ -84,6 +91,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
         raise ValueError("工号不能为空")
 
     existing = user_repository.fetch_user(username)
+    is_update = bool(existing)
     role = _normalize_role(payload.get("role"))
     user_payload = {
         "display_name": _normalize_text(payload.get("displayName")),
@@ -120,7 +128,15 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
             }
         )
 
-    return get_user_summary(username)
+    item = get_user_summary(username)
+    _safe_record_operation(
+        actor_username,
+        "用户管理",
+        "修改" if is_update else "增加",
+        _user_operation_label(item),
+        item["id"],
+    )
+    return item
 
 
 def list_shift_groups() -> list[dict[str, Any]]:
@@ -131,7 +147,11 @@ def list_floors() -> list[dict[str, Any]]:
     return [_build_floor_summary(row) for row in task_repository.fetch_all_floors()]
 
 
-def save_shift_group(payload: dict[str, Any]) -> dict[str, Any]:
+def list_departments() -> list[dict[str, Any]]:
+    return [_build_department_summary(row) for row in task_repository.fetch_all_departments()]
+
+
+def save_shift_group(payload: dict[str, Any], actor_username: str | None = None) -> dict[str, Any]:
     now = _now_text()
     shift_payload = {
         "name": _normalize_text(payload.get("name")),
@@ -147,24 +167,41 @@ def save_shift_group(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("班次时间不能为空")
 
     shift_group_id = _safe_int(payload.get("id"))
+    is_update = bool(shift_group_id)
     if shift_group_id:
         task_repository.update_shift_group(shift_group_id, shift_payload)
     else:
         shift_group_id = task_repository.insert_shift_group(
             {**shift_payload, "created_at": now}
         )
-    return next(
+    item = next(
         item for item in list_shift_groups() if item["id"] == shift_group_id
+    )
+    _safe_record_operation(
+        actor_username,
+        "系统设置-班次",
+        "修改" if is_update else "增加",
+        _setting_operation_label(item, "班次"),
+        item["id"],
+    )
+    return item
+
+
+def delete_shift_group(shift_group_id: int, actor_username: str | None = None) -> None:
+    existing = task_repository.fetch_shift_group(shift_group_id)
+    if not existing:
+        raise ValueError("班次不存在")
+    task_repository.delete_shift_group(shift_group_id)
+    _safe_record_operation(
+        actor_username,
+        "系统设置-班次",
+        "删除",
+        f"#{shift_group_id} / 班次 / {_normalize_text(existing['name'])}",
+        shift_group_id,
     )
 
 
-def delete_shift_group(shift_group_id: int) -> None:
-    if not task_repository.fetch_shift_group(shift_group_id):
-        raise ValueError("班次不存在")
-    task_repository.delete_shift_group(shift_group_id)
-
-
-def save_floor(payload: dict[str, Any]) -> dict[str, Any]:
+def save_floor(payload: dict[str, Any], actor_username: str | None = None) -> dict[str, Any]:
     now = _now_text()
     floor_payload = {
         "name": _normalize_text(payload.get("name")),
@@ -178,13 +215,68 @@ def save_floor(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("楼层名称已存在")
 
     floor_id = task_repository.insert_floor(floor_payload)
-    return next(item for item in list_floors() if item["id"] == floor_id)
+    item = next(item for item in list_floors() if item["id"] == floor_id)
+    _safe_record_operation(
+        actor_username,
+        "系统设置-楼层",
+        "增加",
+        _setting_operation_label(item, "楼层"),
+        item["id"],
+    )
+    return item
 
 
-def delete_floor(floor_id: int) -> None:
-    if not task_repository.fetch_floor(floor_id):
+def delete_floor(floor_id: int, actor_username: str | None = None) -> None:
+    existing = task_repository.fetch_floor(floor_id)
+    if not existing:
         raise ValueError("楼层不存在")
     task_repository.delete_floor(floor_id)
+    _safe_record_operation(
+        actor_username,
+        "系统设置-楼层",
+        "删除",
+        f"#{floor_id} / 楼层 / {_normalize_text(existing['name'])}",
+        floor_id,
+    )
+
+
+def save_department(payload: dict[str, Any], actor_username: str | None = None) -> dict[str, Any]:
+    now = _now_text()
+    department_payload = {
+        "name": _normalize_text(payload.get("name")),
+        "sort_order": _safe_int(payload.get("sortOrder")) or 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+    if not department_payload["name"]:
+        raise ValueError("部门名称不能为空")
+    if task_repository.fetch_department_by_name(department_payload["name"]):
+        raise ValueError("部门名称已存在")
+
+    department_id = task_repository.insert_department(department_payload)
+    item = next(item for item in list_departments() if item["id"] == department_id)
+    _safe_record_operation(
+        actor_username,
+        "系统设置-部门",
+        "增加",
+        _setting_operation_label(item, "部门"),
+        item["id"],
+    )
+    return item
+
+
+def delete_department(department_id: int, actor_username: str | None = None) -> None:
+    existing = task_repository.fetch_department(department_id)
+    if not existing:
+        raise ValueError("部门不存在")
+    task_repository.delete_department(department_id)
+    _safe_record_operation(
+        actor_username,
+        "系统设置-部门",
+        "删除",
+        f"#{department_id} / 部门 / {_normalize_text(existing['name'])}",
+        department_id,
+    )
 
 
 def get_system_settings() -> dict[str, Any]:
@@ -199,8 +291,69 @@ def get_system_settings() -> dict[str, Any]:
     return settings
 
 
+def list_operation_logs(filters: dict[str, Any]) -> list[dict[str, Any]]:
+    operator = _normalize_text(filters.get("operator")).lower()
+    date_from = _normalize_text(filters.get("dateFrom"))
+    date_to = _normalize_text(filters.get("dateTo"))
+    action_type = _normalize_text(filters.get("actionType"))
+    rows = []
+    for row in task_repository.fetch_all_operation_logs():
+        item = _build_operation_log_summary(row)
+        if operator:
+            operator_haystack = " ".join([item["operatorUser"], item["operatorLabel"]]).lower()
+            if operator not in operator_haystack:
+                continue
+        if date_from and item["operatedAt"][:10] < date_from:
+            continue
+        if date_to and item["operatedAt"][:10] > date_to:
+            continue
+        if action_type and item["actionType"] != action_type:
+            continue
+        rows.append(item)
+    return rows
+
+
+def record_operation(
+    operator_username: str,
+    page_name: str,
+    action_type: str,
+    record_label: str,
+    record_id: Any = "",
+) -> dict[str, Any]:
+    normalized_action = _normalize_text(action_type)
+    if normalized_action not in OPERATION_ACTIONS:
+        raise ValueError("操作功能类型无效")
+    normalized_page_name = _normalize_text(page_name)
+    if not normalized_page_name:
+        raise ValueError("操作页面不能为空")
+    normalized_record_label = _normalize_text(record_label)
+    if not normalized_record_label:
+        raise ValueError("操作记录不能为空")
+
+    try:
+        operator_profile = get_user_summary(operator_username)
+    except KeyError:
+        operator_profile = {
+            "username": _normalize_text(operator_username),
+            "displayLabel": _normalize_text(operator_username) or "未知用户",
+        }
+
+    payload = {
+        "operator_user": _normalize_text(operator_profile.get("username")) or _normalize_text(operator_username),
+        "operator_label": _normalize_text(operator_profile.get("displayLabel")) or _normalize_text(operator_username),
+        "operated_at": _now_text(),
+        "page_name": normalized_page_name,
+        "action_type": normalized_action,
+        "record_label": normalized_record_label,
+        "record_id": _normalize_text(record_id),
+    }
+    operation_id = task_repository.insert_operation_log(payload)
+    return _build_operation_log_summary({**payload, "id": operation_id})
+
+
 def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
-    shifts_by_id = {item["id"]: item for item in list_shift_groups()}
+    shifts = list_shift_groups()
+    shifts_by_id = {item["id"]: item for item in shifts}
     floors_by_id = {item["id"]: item for item in list_floors()}
     attachments_by_owner = _build_attachment_lookup("handover")
     records = []
@@ -212,7 +365,7 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
     receiver_user = _normalize_text(filters.get("receiverUser"))
 
     for row in task_repository.fetch_all_handover_records():
-        record = _build_handover_summary(row, shifts_by_id, floors_by_id, attachments_by_owner)
+        record = _build_handover_summary(row, shifts, shifts_by_id, floors_by_id, attachments_by_owner)
         if date_from and record["recordTime"][:10] < date_from:
             continue
         if date_to and record["recordTime"][:10] > date_to:
@@ -228,10 +381,12 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     record["title"],
                     record["shiftName"],
+                    record["receiverShiftName"],
                     record["floorName"],
                     record["handoverUser"],
                     record["receiverUser"],
                     record["receiverSupervisorLabel"],
+                    record["mentionUserLabels"],
                     record["workSummary"],
                     record["precautions"],
                     record["pendingItems"],
@@ -261,6 +416,7 @@ def save_handover_record(
         "precautions": _normalize_text(payload.get("precautions")),
         "pending_items": _normalize_text(payload.get("pendingItems")),
         "keywords": _normalize_text(payload.get("keywords")),
+        "mention_users": _serialize_mention_users(payload.get("mentionUsers")),
         "updated_at": now,
     }
     if not record_payload["receiver_user"]:
@@ -269,6 +425,7 @@ def save_handover_record(
         raise ValueError("楼层不能为空")
 
     record_id = _safe_int(payload.get("id"))
+    is_update = bool(record_id)
     if record_id:
         if not task_repository.fetch_handover_record(record_id):
             raise ValueError("交接班记录不存在")
@@ -289,14 +446,39 @@ def save_handover_record(
         )
 
     _store_attachments(files, "handover", record_id, actor_username)
-    return next(item for item in list_handover_records({}) if item["id"] == record_id)
+    item = next(item for item in list_handover_records({}) if item["id"] == record_id)
+    _safe_record_operation(
+        actor_username,
+        "交接班记录",
+        "修改" if is_update else "增加",
+        _handover_operation_label(item),
+        item["id"],
+    )
+    return item
 
 
-def list_tasks(filters: dict[str, Any]) -> list[dict[str, Any]]:
+def delete_handover_record(record_id: int, actor_username: str | None = None) -> None:
+    existing = task_repository.fetch_handover_record(record_id)
+    if not existing:
+        raise ValueError("交接班记录不存在")
+    attachments = task_repository.fetch_attachments_for_owner("handover", record_id)
+    task_repository.delete_handover_record(record_id)
+    _delete_attachment_files(attachments)
+    _safe_record_operation(
+        actor_username,
+        "交接班记录",
+        "删除",
+        f"#{record_id} / {_normalize_text(existing['keywords']) or _normalize_text(existing['title']) or _normalize_text(existing['receiver_user'])}",
+        record_id,
+    )
+
+
+def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     attachments_by_owner = _build_attachment_lookup("task")
+    handover_rows = handovers if handovers is not None else list_handover_records({})
     handover_supervisors = {
         item["id"]: item["receiverSupervisorLabel"]
-        for item in list_handover_records({})
+        for item in handover_rows
     }
     keyword = _normalize_text(filters.get("keyword")).lower()
     status = _normalize_text(filters.get("status"))
@@ -323,6 +505,9 @@ def list_tasks(filters: dict[str, Any]) -> list[dict[str, Any]]:
                     task["assigneeUser"],
                     task["creatorUser"],
                     task["supervisorLabel"],
+                    task["mentionUserLabels"],
+                    task["rejectReason"],
+                    task["rejectedBy"],
                 ]
             ).lower()
             if keyword not in haystack:
@@ -352,25 +537,44 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         "start_at": start_at,
         "due_at": due_at,
         "assignee_user": _resolve_person_name(payload.get("assigneeUser")),
+        "mention_users": _serialize_mention_users(payload.get("mentionUsers")),
         "handover_record_id": _safe_int(payload.get("handoverRecordId")),
         "reminder_at": None,
         "updated_at": now,
         "completed_at": now if status == "已完成" else None,
+        "reject_reason": _normalize_text(payload.get("rejectReason")) if status == "已驳回" else "",
+        "rejected_by": _normalize_text(payload.get("rejectedBy")) if status == "已驳回" else "",
+        "rejected_at": _normalize_datetime_text(payload.get("rejectedAt")) if status == "已驳回" else "",
     }
     if not task_payload["title"]:
         raise ValueError("任务标题不能为空")
 
     task_id = _safe_int(payload.get("id"))
+    is_update = bool(task_id)
     if task_id:
         existing = task_repository.fetch_task(task_id)
         if not existing:
             raise KeyError(task_id)
+        if not _can_actor_edit_task(existing, actor_username):
+            raise ValueError("你没有权限编辑该任务")
+        if status == "已驳回" and not task_payload["reject_reason"]:
+            task_payload["reject_reason"] = _normalize_text(existing["reject_reason"])
+            task_payload["rejected_by"] = _normalize_text(existing["rejected_by"])
+            task_payload["rejected_at"] = _normalize_text(existing["rejected_at"])
+        if status == "已驳回" and not task_payload["reject_reason"]:
+            raise ValueError("驳回理由不能为空，请使用驳回按钮填写理由")
         if status == "已完成" and not existing["completed_at"]:
             task_payload["completed_at"] = now
         elif status != "已完成":
             task_payload["completed_at"] = None
+        if status != "已驳回":
+            task_payload["reject_reason"] = ""
+            task_payload["rejected_by"] = ""
+            task_payload["rejected_at"] = ""
         task_repository.update_task(task_id, task_payload)
     else:
+        if status == "已驳回" and not task_payload["reject_reason"]:
+            raise ValueError("驳回理由不能为空，请使用驳回按钮填写理由")
         task_id = task_repository.insert_task(
             {
                 **task_payload,
@@ -380,12 +584,116 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         )
 
     _store_attachments(files, "task", task_id, actor_username)
-    return next(item for item in list_tasks({}) if item["id"] == task_id)
+    item = next(item for item in list_tasks({}) if item["id"] == task_id)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "修改" if is_update else "增加",
+        _task_operation_label(item),
+        item["id"],
+    )
+    return item
 
 
-def get_report_summary() -> dict[str, Any]:
-    handovers = list_handover_records({})
-    tasks = list_tasks({})
+def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
+    existing = task_repository.fetch_task(task_id)
+    if not existing:
+        raise ValueError("任务不存在")
+    status = _normalize_text(existing["status"])
+    if status == "已完成":
+        raise ValueError("已完成任务不能领取")
+    if status == "已驳回":
+        raise ValueError("已驳回任务不能领取")
+    if not _is_actor_task_assignee(existing, actor_username):
+        raise ValueError("只有任务负责人可以领取该任务")
+
+    now = _now_text()
+    actor_profile = get_user_summary(actor_username)
+    task_repository.update_task(
+        task_id,
+        {
+            "assignee_user": actor_profile["displayLabel"],
+            "status": "进行中",
+            "updated_at": now,
+            "completed_at": None,
+            "reject_reason": "",
+            "rejected_by": "",
+            "rejected_at": "",
+        },
+    )
+    item = next(item for item in list_tasks({}) if item["id"] == task_id)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "修改",
+        f"领取 / {_task_operation_label(item)}",
+        item["id"],
+    )
+    return item
+
+
+def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any]:
+    existing = task_repository.fetch_task(task_id)
+    if not existing:
+        raise ValueError("任务不存在")
+    reject_reason = _normalize_text(reason)
+    if not reject_reason:
+        raise ValueError("驳回理由不能为空")
+    if _normalize_text(existing["status"]) == "已完成":
+        raise ValueError("已完成任务不能驳回")
+    if _normalize_text(existing["status"]) == "已驳回":
+        raise ValueError("已驳回任务不能重复驳回")
+    if not (_is_actor_task_assignee(existing, actor_username) or _actor_has_level5(actor_username)):
+        raise ValueError("只有任务负责人或 5 级权限者可以驳回该任务")
+
+    now = _now_text()
+    actor_profile = get_user_summary(actor_username)
+    task_repository.update_task(
+        task_id,
+        {
+            "status": "已驳回",
+            "reject_reason": reject_reason,
+            "rejected_by": actor_profile["displayLabel"],
+            "rejected_at": now,
+            "updated_at": now,
+            "completed_at": None,
+        },
+    )
+    item = next(item for item in list_tasks({}) if item["id"] == task_id)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "修改",
+        f"驳回 / {_task_operation_label(item)}",
+        item["id"],
+    )
+    return item
+
+
+def delete_task(task_id: int, actor_username: str | None = None) -> None:
+    existing = task_repository.fetch_task(task_id)
+    if not existing:
+        raise ValueError("任务不存在")
+    if actor_username and not _can_actor_edit_task(existing, actor_username):
+        raise ValueError("你没有权限删除该任务")
+    attachments = task_repository.fetch_attachments_for_owner("task", task_id)
+    task_repository.delete_task(task_id)
+    _delete_attachment_files(attachments)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "删除",
+        f"#{task_id} / {_normalize_text(existing['title'])}",
+        task_id,
+    )
+
+
+def get_report_summary(
+    handovers: list[dict[str, Any]] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    handovers = handovers if handovers is not None else list_handover_records({})
+    tasks = tasks if tasks is not None else list_tasks({}, handovers=handovers)
     tasks_by_status = {status: 0 for status in TASK_STATUSES}
     for task in tasks:
         tasks_by_status[task["status"]] = tasks_by_status.get(task["status"], 0) + 1
@@ -404,33 +712,83 @@ def get_report_summary() -> dict[str, Any]:
     }
 
 
-def get_reminders() -> dict[str, Any]:
-    settings = get_system_settings()
+def get_reminders(
+    username: str | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    handovers: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     now = datetime.now()
-    task_due_hours = int(settings["notifications.task_due_hours"])
-    handover_minutes = int(settings["notifications.handover_minutes"])
-    due_before = now + timedelta(hours=task_due_hours)
+    user_values = _get_user_identity_values(username)
+    tasks = tasks if tasks is not None else list_tasks({})
+    handovers = handovers if handovers is not None else list_handover_records({})
 
-    due_tasks = [
-        task
-        for task in list_tasks({})
-        if task["status"] != "已完成"
-        and task["dueAt"]
-        and now <= _parse_datetime(task["dueAt"]) <= due_before
-    ]
+    due_tasks = []
+    for task in tasks:
+        if task["status"] in {"已完成", "已驳回"} or not task["startAt"]:
+            continue
+        start_at = _parse_datetime(task["startAt"])
+        related_by_assignee = _is_user_related_to_values(user_values, task.get("assigneeUser"))
+        related_by_mention = _is_user_related_to_any(user_values, task.get("mentionUsers"))
+        related_by_text_mention = _is_user_mentioned(
+            user_values,
+            task.get("title"),
+            task.get("description"),
+        )
+        if not (related_by_assignee or related_by_mention or related_by_text_mention):
+            continue
+        if start_at < now:
+            continue
+        minutes_until = int((start_at - now).total_seconds() // 60)
+        due_tasks.append(
+            {
+                **task,
+                "reminderId": f"task:{task['id']}:{task['startAt']}",
+                "reminderType": "task",
+                "reminderTitle": task["title"],
+                "reminderTime": task["startAt"],
+                "minutesUntil": minutes_until,
+                "remainingText": _format_remaining_text(minutes_until),
+            }
+        )
 
     shift_reminders = []
-    for shift in list_shift_groups():
-        next_start = _get_next_shift_datetime(shift["startTime"], now)
+    shifts_by_id = {item["id"]: item for item in list_shift_groups()}
+    for record in handovers:
+        related_by_receiver = _is_user_related_to_values(user_values, record.get("receiverUser"))
+        related_by_mention = _is_user_related_to_any(user_values, record.get("mentionUsers"))
+        related_by_text_mention = _is_user_mentioned(
+            user_values,
+            record.get("workSummary"),
+            record.get("precautions"),
+            record.get("pendingItems"),
+            record.get("keywords"),
+        )
+        if not (related_by_receiver or related_by_mention or related_by_text_mention):
+            continue
+        receiver_shift = shifts_by_id.get(record.get("receiverShiftGroupId"))
+        if not receiver_shift:
+            continue
+        record_reference = _parse_datetime(record.get("createdAt") or record.get("recordTime"))
+        next_start = _get_next_shift_datetime(receiver_shift["startTime"], record_reference)
+        if next_start < now:
+            continue
         minutes_until = int((next_start - now).total_seconds() // 60)
-        if 0 <= minutes_until <= handover_minutes:
-            shift_reminders.append(
-                {
-                    "shiftName": shift["name"],
-                    "startTime": next_start.isoformat(timespec="minutes"),
-                    "minutesUntil": minutes_until,
-                }
-            )
+        shift_reminders.append(
+            {
+                "reminderId": f"handover:{record['id']}:{next_start.isoformat(timespec='minutes')}",
+                "reminderType": "handover",
+                "reminderTitle": f"{record['receiverShiftName']}接班提醒",
+                "handoverRecordId": record["id"],
+                "shiftName": record["shiftName"],
+                "receiverShiftName": record["receiverShiftName"],
+                "handoverUser": record["handoverUser"],
+                "receiverUser": record["receiverUser"],
+                "keywords": record["keywords"],
+                "startTime": next_start.isoformat(timespec="minutes"),
+                "minutesUntil": minutes_until,
+                "remainingText": _format_remaining_text(minutes_until),
+            }
+        )
 
     return {
         "dueTasks": due_tasks[:10],
@@ -458,6 +816,31 @@ def _seed_shift_groups() -> None:
             {
                 **item,
                 "is_active": 1,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+
+
+def _seed_departments() -> None:
+    if task_repository.fetch_all_departments():
+        return
+
+    department_names = []
+    for row in user_repository.fetch_all_users():
+        department_name = _normalize_text(row["department"])
+        if department_name and department_name not in department_names:
+            department_names.append(department_name)
+
+    if not department_names:
+        department_names = ["系统管理部", "AA PE", "AA生产一部", "OC PE", "设备维护"]
+
+    now = _now_text()
+    for index, name in enumerate(department_names, 1):
+        task_repository.insert_department(
+            {
+                "name": name,
+                "sort_order": index,
                 "created_at": now,
                 "updated_at": now,
             }
@@ -499,16 +882,30 @@ def _store_attachments(files, owner_type: str, owner_id: int, actor_username: st
         )
 
 
+def _delete_attachment_files(attachments) -> None:
+    upload_root = UPLOAD_ROOT.resolve()
+    for attachment in attachments:
+        stored_path = _normalize_text(attachment["stored_path"])
+        if not stored_path:
+            continue
+        try:
+            file_path = Path(stored_path).resolve()
+        except OSError:
+            continue
+        if file_path != upload_root and upload_root not in file_path.parents:
+            continue
+        try:
+            file_path.unlink(missing_ok=True)
+        except OSError:
+            # The database row is already gone; leave locked files for manual cleanup.
+            continue
+
+
 def _build_attachment_lookup(owner_type: str) -> dict[int, list[dict[str, Any]]]:
     lookup: dict[int, list[dict[str, Any]]] = {}
-    owner_rows = []
-    if owner_type == "handover":
-        owner_rows = task_repository.fetch_all_handover_records()
-    elif owner_type == "task":
-        owner_rows = task_repository.fetch_all_tasks()
-
-    for row in owner_rows:
-        attachments = [
+    for item in task_repository.fetch_attachments_by_owner_type(owner_type):
+        owner_id = int(item["owner_id"])
+        lookup.setdefault(owner_id, []).append(
             {
                 "id": item["id"],
                 "originalName": item["original_name"],
@@ -516,11 +913,88 @@ def _build_attachment_lookup(owner_type: str) -> dict[int, list[dict[str, Any]]]
                 "uploadedBy": item["uploaded_by"],
                 "uploadedAt": item["uploaded_at"],
                 "downloadUrl": f"/api/task-system/attachments/{item['id']}",
+                "previewUrl": f"/api/task-system/attachments/{item['id']}/preview",
             }
-            for item in task_repository.fetch_attachments_for_owner(owner_type, row["id"])
-        ]
-        lookup[row["id"]] = attachments
+        )
     return lookup
+
+
+def _safe_record_operation(
+    operator_username: str | None,
+    page_name: str,
+    action_type: str,
+    record_label: str,
+    record_id: Any = "",
+) -> None:
+    if not operator_username:
+        return
+    try:
+        record_operation(operator_username, page_name, action_type, record_label, record_id)
+    except Exception:
+        # Operation logs should never block the user's actual business action.
+        return
+
+
+def _build_operation_log_summary(row) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "operatorUser": _normalize_text(row["operator_user"]),
+        "operatorLabel": _normalize_text(row["operator_label"]),
+        "operatedAt": _normalize_text(row["operated_at"]),
+        "pageName": _normalize_text(row["page_name"]),
+        "actionType": _normalize_text(row["action_type"]),
+        "recordLabel": _normalize_text(row["record_label"]),
+        "recordId": _normalize_text(row["record_id"]),
+    }
+
+
+def _handover_operation_label(record: dict[str, Any]) -> str:
+    return " / ".join(
+        item
+        for item in [
+            f"#{record.get('id')}",
+            _normalize_text(record.get("keywords")),
+            _normalize_text(record.get("floorName")),
+            _normalize_text(record.get("receiverUser")),
+        ]
+        if item
+    )
+
+
+def _task_operation_label(record: dict[str, Any]) -> str:
+    return " / ".join(
+        item
+        for item in [
+            f"#{record.get('id')}",
+            _normalize_text(record.get("title")),
+            _normalize_text(record.get("assigneeUser")),
+        ]
+        if item
+    )
+
+
+def _user_operation_label(record: dict[str, Any]) -> str:
+    return " / ".join(
+        item
+        for item in [
+            f"#{record.get('id')}",
+            _normalize_text(record.get("username")),
+            _normalize_text(record.get("displayLabel") or record.get("displayName")),
+        ]
+        if item
+    )
+
+
+def _setting_operation_label(record: dict[str, Any], prefix: str) -> str:
+    return " / ".join(
+        item
+        for item in [
+            f"#{record.get('id')}",
+            prefix,
+            _normalize_text(record.get("name")),
+        ]
+        if item
+    )
 
 
 def _build_user_summary(row) -> dict[str, Any]:
@@ -567,8 +1041,19 @@ def _build_floor_summary(row) -> dict[str, Any]:
     }
 
 
+def _build_department_summary(row) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "name": _normalize_text(row["name"]),
+        "sortOrder": int(row["sort_order"] or 0),
+        "createdAt": _normalize_text(row["created_at"]),
+        "updatedAt": _normalize_text(row["updated_at"]),
+    }
+
+
 def _build_handover_summary(
     row,
+    shifts: list[dict[str, Any]],
     shifts_by_id: dict[int, dict[str, Any]],
     floors_by_id: dict[int, dict[str, Any]],
     attachments_by_owner: dict[int, list[dict[str, Any]]],
@@ -576,13 +1061,17 @@ def _build_handover_summary(
     shift_group_id = _safe_int(row["shift_group_id"])
     floor_id = _safe_int(row["floor_id"])
     shift = shifts_by_id.get(shift_group_id, {})
+    receiver_shift = _get_next_shift(shift_group_id, shifts)
     floor = floors_by_id.get(floor_id, {})
     supervisor = _get_supervisor_for_person(row["receiver_user"])
+    mention_users = _parse_mention_users(row["mention_users"])
     return {
         "id": int(row["id"]),
         "title": _normalize_text(row["title"]),
         "shiftGroupId": shift_group_id,
         "shiftName": _normalize_text(shift.get("name")) or "--",
+        "receiverShiftGroupId": receiver_shift.get("id"),
+        "receiverShiftName": _normalize_text(receiver_shift.get("name")) or "--",
         "floorId": floor_id,
         "floorName": _normalize_text(floor.get("name")) or "--",
         "recordTime": _normalize_text(row["record_time"]),
@@ -594,6 +1083,8 @@ def _build_handover_summary(
         "precautions": _normalize_text(row["precautions"]),
         "pendingItems": _normalize_text(row["pending_items"]),
         "keywords": _normalize_text(row["keywords"]),
+        "mentionUsers": mention_users,
+        "mentionUserLabels": _format_mention_user_labels(mention_users),
         "createdBy": _normalize_text(row["created_by"]),
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
@@ -602,6 +1093,7 @@ def _build_handover_summary(
 
 
 def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]]]):
+    mention_users = _parse_mention_users(row["mention_users"])
     return {
         "id": int(row["id"]),
         "title": _normalize_text(row["title"]),
@@ -611,12 +1103,17 @@ def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]
         "startAt": _normalize_text(row["start_at"]),
         "dueAt": _normalize_text(row["due_at"]),
         "assigneeUser": _normalize_text(row["assignee_user"]),
+        "mentionUsers": mention_users,
+        "mentionUserLabels": _format_mention_user_labels(mention_users),
         "creatorUser": _normalize_text(row["creator_user"]),
         "handoverRecordId": _safe_int(row["handover_record_id"]),
         "supervisorLabel": "",
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "completedAt": _normalize_text(row["completed_at"]),
+        "rejectReason": _normalize_text(row["reject_reason"]),
+        "rejectedBy": _normalize_text(row["rejected_by"]),
+        "rejectedAt": _normalize_text(row["rejected_at"]),
         "attachments": attachments_by_owner.get(int(row["id"]), []),
     }
 
@@ -625,6 +1122,97 @@ def _normalize_text(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _parse_mention_users(value) -> list[str]:
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        text_value = _normalize_text(value)
+        if not text_value:
+            return []
+        try:
+            parsed_value = json.loads(text_value)
+            raw_items = parsed_value if isinstance(parsed_value, list) else []
+        except json.JSONDecodeError:
+            raw_items = text_value.split(",")
+
+    mention_users: list[str] = []
+    seen_values: set[str] = set()
+    for item in raw_items:
+        normalized_item = _normalize_text(item)
+        if not normalized_item or normalized_item in seen_values:
+            continue
+        seen_values.add(normalized_item)
+        mention_users.append(normalized_item)
+    return mention_users
+
+
+def _serialize_mention_users(value) -> str:
+    return json.dumps(_parse_mention_users(value), ensure_ascii=False)
+
+
+def _format_mention_user_labels(values) -> str:
+    labels: list[str] = []
+    for value in _parse_mention_users(values):
+        user_row = user_repository.fetch_user(value)
+        if not user_row:
+            for row in user_repository.fetch_all_users():
+                display_name = _normalize_text(row["display_name"])
+                username = _normalize_text(row["user"])
+                if value in {display_name, username}:
+                    user_row = row
+                    break
+        if user_row:
+            labels.append(_normalize_text(user_row["display_name"]) or _normalize_text(user_row["user"]))
+        else:
+            labels.append(value)
+    return "、".join(labels)
+
+
+def _find_user_row_by_identity(value):
+    normalized_value = _normalize_text(value)
+    if not normalized_value:
+        return None
+    user_row = user_repository.fetch_user(normalized_value)
+    if user_row:
+        return user_row
+    for row in user_repository.fetch_all_users():
+        username = _normalize_text(row["user"])
+        display_name = _normalize_text(row["display_name"])
+        if normalized_value in {username, display_name}:
+            return row
+    return None
+
+
+def _actor_has_level5(actor_username: str) -> bool:
+    try:
+        actor_profile = get_user_summary(actor_username)
+    except KeyError:
+        return False
+    return int(actor_profile.get("permissionLevel") or 1) >= 5
+
+
+def _is_actor_task_assignee(task_row, actor_username: str) -> bool:
+    return _is_user_related_to_values(
+        _get_user_identity_values(actor_username),
+        task_row["assignee_user"],
+    )
+
+
+def _can_actor_edit_task(task_row, actor_username: str) -> bool:
+    if _actor_has_level5(actor_username):
+        return True
+
+    actor_values = _get_user_identity_values(actor_username)
+    creator_user = _normalize_text(task_row["creator_user"])
+    if _is_user_related_to_values(actor_values, creator_user):
+        return True
+
+    creator_row = _find_user_row_by_identity(creator_user)
+    if not creator_row:
+        return False
+    return _normalize_text(creator_row["supervisor_user"]) == _normalize_text(actor_username)
 
 
 def _normalize_role(value) -> str:
@@ -672,6 +1260,85 @@ def _get_supervisor_for_person(value) -> dict[str, str]:
     if supervisor_row:
         supervisor_label = _normalize_text(supervisor_row["display_name"]) or _normalize_text(supervisor_row["user"])
     return {"username": supervisor_user, "label": supervisor_label or supervisor_user}
+
+
+def _get_user_identity_values(username: str | None) -> set[str]:
+    normalized_username = _normalize_text(username)
+    if not normalized_username:
+        return set()
+
+    values = {normalized_username}
+    user_row = user_repository.fetch_user(normalized_username)
+    if not user_row:
+        return values
+
+    display_name = _normalize_text(user_row["display_name"])
+    if display_name:
+        values.add(display_name)
+    return values
+
+
+def _is_user_related_to_values(user_values: set[str], value) -> bool:
+    normalized_value = _normalize_text(value)
+    if not user_values or not normalized_value:
+        return False
+    if normalized_value in user_values:
+        return True
+
+    user_row = user_repository.fetch_user(normalized_value)
+    if user_row:
+        return _normalize_text(user_row["user"]) in user_values or _normalize_text(user_row["display_name"]) in user_values
+
+    for row in user_repository.fetch_all_users():
+        username = _normalize_text(row["user"])
+        display_name = _normalize_text(row["display_name"])
+        if normalized_value in {username, display_name}:
+            return username in user_values or display_name in user_values
+    return False
+
+
+def _is_user_related_to_any(user_values: set[str], values) -> bool:
+    return any(
+        _is_user_related_to_values(user_values, value)
+        for value in _parse_mention_users(values)
+    )
+
+
+def _is_user_mentioned(user_values: set[str], *texts) -> bool:
+    if not user_values:
+        return False
+    normalized_text = "\n".join(_normalize_text(text) for text in texts if _normalize_text(text))
+    if not normalized_text:
+        return False
+    return any(f"@{value}" in normalized_text for value in user_values if value)
+
+
+def _format_remaining_text(minutes_until: int) -> str:
+    safe_minutes = max(0, int(minutes_until or 0))
+    total_hours = (safe_minutes + 59) // 60 if safe_minutes else 0
+    days = total_hours // 24
+    hours = total_hours % 24
+    return f"{days}天{hours:02d}小时"
+
+
+def _get_next_shift(shift_group_id: int | None, shifts: list[dict[str, Any]]) -> dict[str, Any]:
+    if not shift_group_id or not shifts:
+        return {}
+
+    sorted_shifts = sorted(
+        shifts,
+        key=lambda item: (
+            _safe_int(item.get("sortOrder")) or 0,
+            _safe_int(item.get("id")) or 0,
+        ),
+    )
+    current_index = next(
+        (index for index, item in enumerate(sorted_shifts) if item["id"] == shift_group_id),
+        None,
+    )
+    if current_index is None:
+        return {}
+    return sorted_shifts[(current_index + 1) % len(sorted_shifts)]
 
 
 def _safe_int(value) -> int | None:

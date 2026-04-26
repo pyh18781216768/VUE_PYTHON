@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class AppConfig:
     SECRET_KEY = os.environ.get("APP_SECRET_KEY", "fab-dashboard-local-secret")
     DATABASE_DIR = Path(
-        os.environ.get("APP_DATABASE_DIR", r"E:\pyh\data")
+        os.environ.get("APP_DATABASE_DIR", r"C:\Users\18781\Desktop\VUE_PYTHON\data")
     )
     USER_DATABASE_PATH = Path(
         os.environ.get("APP_USER_DATABASE_PATH", str(DATABASE_DIR / "user.db"))

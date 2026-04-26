@@ -27,12 +27,14 @@ def _export_excel(export_type: str, rows: list[dict]) -> tuple[BytesIO, str, str
     if export_type == "handover":
         headers = [
             ("title", "标题"),
-            ("shiftName", "班次"),
+            ("shiftName", "交班班次"),
+            ("receiverShiftName", "接班班次"),
             ("floorName", "楼层"),
             ("recordTime", "记录时间"),
             ("handoverUser", "交班人"),
             ("receiverUser", "接班人"),
             ("receiverSupervisorLabel", "主管"),
+            ("mentionUserLabels", "@人员"),
             ("workSummary", "当班情况"),
             ("precautions", "注意事项"),
             ("pendingItems", "未完成事项"),
@@ -49,6 +51,10 @@ def _export_excel(export_type: str, rows: list[dict]) -> tuple[BytesIO, str, str
             ("dueAt", "到期时间"),
             ("handoverRecordId", "关联交接记录"),
             ("supervisorLabel", "主管"),
+            ("mentionUserLabels", "@人员"),
+            ("rejectReason", "驳回理由"),
+            ("rejectedBy", "驳回人"),
+            ("rejectedAt", "驳回时间"),
             ("description", "任务说明"),
         ]
 

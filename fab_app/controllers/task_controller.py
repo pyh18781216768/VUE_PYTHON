@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 from functools import wraps
 
 from flask import Blueprint, jsonify, request, send_file
@@ -8,24 +9,33 @@ from flask import Blueprint, jsonify, request, send_file
 from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.services.task_export_service import export_task_data
 from fab_app.services.task_system_service import (
+    claim_task,
+    delete_department,
     delete_floor,
+    delete_handover_record,
     delete_shift_group,
+    delete_task,
     get_attachment_file,
     get_reminders,
     get_report_summary,
     get_task_system_payload,
     get_user_summary,
     get_system_settings,
+    list_departments,
     list_handover_records,
     list_floors,
+    list_operation_logs,
     list_shift_groups,
     list_tasks,
     list_users,
+    record_operation,
     save_handover_record,
+    save_department,
     save_floor,
     save_shift_group,
     save_task,
     save_user,
+    reject_task,
 )
 
 
@@ -78,7 +88,7 @@ def task_shifts():
 def save_task_shift():
     payload = request.get_json(silent=True) or {}
     try:
-        item = save_shift_group(payload)
+        item = save_shift_group(payload, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"item": item})
@@ -88,7 +98,7 @@ def save_task_shift():
 @admin_required
 def delete_task_shift(shift_group_id: int):
     try:
-        delete_shift_group(shift_group_id)
+        delete_shift_group(shift_group_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"message": "班次已删除。"})
@@ -105,7 +115,7 @@ def task_floors():
 def save_task_floor():
     payload = request.get_json(silent=True) or {}
     try:
-        item = save_floor(payload)
+        item = save_floor(payload, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"item": item})
@@ -115,16 +125,66 @@ def save_task_floor():
 @admin_required
 def delete_task_floor(floor_id: int):
     try:
-        delete_floor(floor_id)
+        delete_floor(floor_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"message": "楼层已删除。"})
+
+
+@task_blueprint.get("/api/task-system/departments")
+@login_required
+def task_departments():
+    return jsonify({"items": list_departments()})
+
+
+@task_blueprint.post("/api/task-system/departments")
+@admin_required
+def save_task_department():
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = save_department(payload, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.delete("/api/task-system/departments/<int:department_id>")
+@admin_required
+def delete_task_department(department_id: int):
+    try:
+        delete_department(department_id, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "部门已删除。"})
 
 
 @task_blueprint.get("/api/task-system/settings")
 @login_required
 def task_settings():
     return jsonify(get_system_settings())
+
+
+@task_blueprint.get("/api/task-system/operation-logs")
+@admin_required
+def operation_logs():
+    return jsonify({"items": list_operation_logs(request.args)})
+
+
+@task_blueprint.post("/api/task-system/operation-logs")
+@login_required
+def create_operation_log():
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = record_operation(
+            current_username(),
+            payload.get("pageName"),
+            payload.get("actionType") or "查看",
+            payload.get("recordLabel"),
+            payload.get("recordId"),
+        )
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
 
 
 @task_blueprint.get("/api/task-system/handover-records")
@@ -145,6 +205,16 @@ def save_handover():
     return jsonify({"item": item})
 
 
+@task_blueprint.delete("/api/task-system/handover-records/<int:record_id>")
+@login_required
+def delete_handover(record_id: int):
+    try:
+        delete_handover_record(record_id, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "交接班记录已删除。"})
+
+
 @task_blueprint.get("/api/task-system/tasks")
 @login_required
 def tasks():
@@ -163,6 +233,37 @@ def save_task_item():
     return jsonify({"item": item})
 
 
+@task_blueprint.post("/api/task-system/tasks/<int:task_id>/claim")
+@login_required
+def claim_task_item(task_id: int):
+    try:
+        item = claim_task(task_id, current_username())
+    except (KeyError, ValueError) as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.post("/api/task-system/tasks/<int:task_id>/reject")
+@login_required
+def reject_task_item(task_id: int):
+    payload = _read_payload()
+    try:
+        item = reject_task(task_id, payload.get("reason"), current_username())
+    except (KeyError, ValueError) as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.delete("/api/task-system/tasks/<int:task_id>")
+@login_required
+def delete_task_item(task_id: int):
+    try:
+        delete_task(task_id, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "任务已删除。"})
+
+
 @task_blueprint.get("/api/task-system/reports")
 @login_required
 def task_reports():
@@ -172,7 +273,7 @@ def task_reports():
 @task_blueprint.get("/api/task-system/reminders")
 @login_required
 def task_reminders():
-    return jsonify(get_reminders())
+    return jsonify(get_reminders(current_username()))
 
 
 @task_blueprint.post("/api/task-system/export")
@@ -208,6 +309,26 @@ def download_task_attachment(attachment_id: int):
         as_attachment=True,
         download_name=payload["filename"],
         mimetype=payload["contentType"],
+    )
+
+
+@task_blueprint.get("/api/task-system/attachments/<int:attachment_id>/preview")
+@login_required
+def preview_task_attachment(attachment_id: int):
+    try:
+        payload = get_attachment_file(attachment_id)
+    except KeyError:
+        return jsonify({"message": "附件不存在。"}), 404
+    content_type = str(payload["contentType"] or "")
+    filename = str(payload["filename"] or "").lower()
+    image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg")
+    if not content_type.startswith("image/") and not filename.endswith(image_extensions):
+        return jsonify({"message": "该附件不是图片，无法预览。"}), 400
+    preview_mimetype = content_type if content_type.startswith("image/") else mimetypes.guess_type(filename)[0]
+    return send_file(
+        payload["path"],
+        as_attachment=False,
+        mimetype=preview_mimetype or payload["contentType"],
     )
 
 

@@ -6,6 +6,8 @@
   const ACTIVE_SYSTEM_STORAGE_KEY = "fab_active_system_mode";
   const THRESHOLD_STORAGE_PREFIX = "fab_dashboard_thresholds_";
   const DASHBOARD_THUMBNAILS_PER_PAGE = 12;
+  const FLASH_MESSAGE_TIMEOUT_MS = 3000;
+  const NOTIFICATION_READ_STORAGE_PREFIX = "fab_notification_reads_";
 
   const ROUTES = {
     home: "/",
@@ -28,6 +30,7 @@
   const CHART_SPLIT = "rgba(199, 220, 237, 0.14)";
   const CHART_TOOLTIP_BG = "rgba(5, 16, 30, 0.96)";
 
+  // === Dashboard page configs ===
   const PAGE_CONFIGS = {
     angle: {
       key: "angle",
@@ -237,9 +240,12 @@
     users: [],
     shifts: [],
     floors: [],
+    departments: [],
     settings: {},
     handovers: [],
     tasks: [],
+    operationLogs: [],
+    operationActions: ["增加", "修改", "删除", "查看"],
     reports: {
       handoverCount: 0,
       taskCount: 0,
@@ -479,6 +485,7 @@
     return columns;
   }
 
+  // === Shared searchable select component ===
   const SearchableSelect = {
     props: {
       modelValue: { type: [String, Number], default: "" },
@@ -635,8 +642,181 @@
     `,
   };
 
+  const MultiSearchableSelect = {
+    props: {
+      modelValue: { type: Array, default: () => [] },
+      options: { type: Array, default: () => [] },
+      placeholder: { type: String, default: "搜索或选择" },
+      disabled: { type: Boolean, default: false },
+    },
+    emits: ["update:modelValue"],
+    setup(props, { emit }) {
+      const root = ref(null);
+      const inputRef = ref(null);
+      const query = ref("");
+      const open = ref(false);
+
+      const normalizedOptions = computed(() =>
+        props.options.map((item) => {
+          if (typeof item === "object" && item !== null) {
+            const value = item.value ?? "";
+            return { value: String(value), label: String(item.label ?? value) };
+          }
+          return { value: String(item ?? ""), label: String(item ?? "") };
+        })
+      );
+
+      const selectedValues = computed(() =>
+        new Set((props.modelValue || []).map((item) => String(item)))
+      );
+
+      const selectedOptions = computed(() =>
+        (props.modelValue || []).map((value) => {
+          const normalizedValue = String(value);
+          return (
+            normalizedOptions.value.find((item) => item.value === normalizedValue) ||
+            { value: normalizedValue, label: normalizedValue }
+          );
+        })
+      );
+
+      const filteredOptions = computed(() => {
+        const keyword = query.value.trim().toLowerCase();
+        return normalizedOptions.value.filter((item) => {
+          if (selectedValues.value.has(item.value)) return false;
+          if (!keyword) return true;
+          return `${item.label} ${item.value}`.toLowerCase().includes(keyword);
+        });
+      });
+
+      function emitValues(values) {
+        const nextValues = [];
+        const seenValues = new Set();
+        values.forEach((value) => {
+          const normalizedValue = String(value || "").trim();
+          if (!normalizedValue || seenValues.has(normalizedValue)) return;
+          seenValues.add(normalizedValue);
+          nextValues.push(normalizedValue);
+        });
+        emit("update:modelValue", nextValues);
+      }
+
+      function focusInput() {
+        if (props.disabled) return;
+        open.value = true;
+        nextTick(() => inputRef.value?.focus());
+      }
+
+      function choose(option) {
+        if (!option || selectedValues.value.has(option.value)) return;
+        emitValues([...(props.modelValue || []), option.value]);
+        query.value = "";
+        open.value = true;
+        nextTick(() => inputRef.value?.focus());
+      }
+
+      function remove(value) {
+        emitValues((props.modelValue || []).filter((item) => String(item) !== String(value)));
+        open.value = true;
+        nextTick(() => inputRef.value?.focus());
+      }
+
+      function handleInput(event) {
+        query.value = event.target.value;
+        open.value = true;
+      }
+
+      function handleBackspace() {
+        if (query.value || !selectedOptions.value.length) return;
+        remove(selectedOptions.value[selectedOptions.value.length - 1].value);
+      }
+
+      function selectFirst() {
+        const [first] = filteredOptions.value;
+        if (first) choose(first);
+      }
+
+      function close() {
+        open.value = false;
+        query.value = "";
+      }
+
+      function handleDocumentClick(event) {
+        if (!root.value || root.value.contains(event.target)) return;
+        close();
+      }
+
+      onMounted(() => document.addEventListener("click", handleDocumentClick));
+      onBeforeUnmount(() => document.removeEventListener("click", handleDocumentClick));
+
+      return {
+        root,
+        inputRef,
+        query,
+        open,
+        selectedOptions,
+        filteredOptions,
+        focusInput,
+        choose,
+        remove,
+        handleInput,
+        handleBackspace,
+        selectFirst,
+        close,
+      };
+    },
+    template: `
+      <div class="multi-searchable-select" ref="root" @click.stop="focusInput">
+        <div :class="['multi-searchable-select-control', { focused: open }]">
+          <span
+            v-for="item in selectedOptions"
+            :key="item.value"
+            class="multi-searchable-select-token"
+          >
+            {{ item.label }}
+            <button
+              type="button"
+              class="multi-searchable-select-remove"
+              aria-label="移除"
+              @click.stop="remove(item.value)"
+            >
+              x
+            </button>
+          </span>
+          <input
+            ref="inputRef"
+            class="multi-searchable-select-input"
+            type="text"
+            :value="query"
+            :placeholder="selectedOptions.length ? '' : placeholder"
+            :disabled="disabled"
+            autocomplete="off"
+            @focus="open = true"
+            @input="handleInput"
+            @keydown.backspace="handleBackspace"
+            @keydown.enter.prevent="selectFirst"
+            @keydown.esc.prevent.stop="close"
+          />
+        </div>
+        <div v-if="open" class="searchable-select-menu multi-searchable-select-menu" @click.stop>
+          <button
+            v-for="item in filteredOptions"
+            :key="item.value + ':' + item.label"
+            type="button"
+            class="searchable-select-option"
+            @click.stop="choose(item)"
+          >
+            {{ item.label }}
+          </button>
+          <div v-if="!filteredOptions.length" class="searchable-select-empty">无匹配选项</div>
+        </div>
+      </div>
+    `,
+  };
+
+  // === App setup and state ===
   createApp({
-    components: { SearchableSelect },
+    components: { SearchableSelect, MultiSearchableSelect },
     setup() {
       const chartRefs = { trend: null, category: null, top: null };
 
@@ -661,6 +841,9 @@
       const loading = ref(true);
       const error = ref("");
       const navDrawerOpen = ref(false);
+      const notificationPanelOpen = ref(false);
+      const notificationReadIds = ref(new Set());
+      let notificationClickTimer = null;
 
       const profileDialogOpen = ref(false);
       const profileSaving = ref(false);
@@ -708,6 +891,10 @@
       ]);
       const userSort = reactive([
         { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "desc" },
+      ]);
+      const operationSort = reactive([
+        { field: "operatedAt", direction: "desc" },
         { field: "id", direction: "desc" },
       ]);
       const detailMode = ref("rate");
@@ -767,6 +954,15 @@
       const floorFilters = reactive({
         keyword: "",
       });
+      const departmentFilters = reactive({
+        keyword: "",
+      });
+      const operationFilters = reactive({
+        operator: "",
+        dateFrom: "",
+        dateTo: "",
+        actionType: "",
+      });
       const handoverForm = reactive({
         id: "",
         title: "",
@@ -779,6 +975,7 @@
         precautions: "",
         pendingItems: "",
         keywords: "",
+        mentionUsers: [],
       });
       const taskForm = reactive({
         id: "",
@@ -790,6 +987,12 @@
         dueAt: "",
         assigneeUser: "",
         handoverRecordId: "",
+        mentionUsers: [],
+      });
+      const taskRejectForm = reactive({
+        taskId: "",
+        title: "",
+        reason: "",
       });
       const userForm = reactive({
         username: "",
@@ -812,6 +1015,11 @@
         name: "",
         sortOrder: 0,
       });
+      const departmentForm = reactive({
+        id: "",
+        name: "",
+        sortOrder: 0,
+      });
       const handoverFiles = ref([]);
       const taskFiles = ref([]);
       const taskActionSubmitting = ref(false);
@@ -819,9 +1027,21 @@
       const taskActionTone = ref("error");
       const handoverFormOpen = ref(false);
       const taskFormOpen = ref(false);
+      const taskRejectDialogOpen = ref(false);
+      const attachmentPreviewOpen = ref(false);
+      const attachmentPreviewFile = ref(null);
+      const detailDialogOpen = ref(false);
+      const detailDialogType = ref("");
+      const detailDialogRecord = ref(null);
       const userFormOpen = ref(false);
       const shiftFormOpen = ref(false);
       const floorFormOpen = ref(false);
+      const departmentFormOpen = ref(false);
+      const flashMessageTimers = {
+        taskAction: null,
+        profile: null,
+        export: null,
+      };
 
       const pageConfig = computed(() => PAGE_CONFIGS[activePage.value] || PAGE_CONFIGS.angle);
       const isAdmin = computed(() => Number(authUser.value.permissionLevel || 1) >= 5);
@@ -833,6 +1053,7 @@
       );
       const shiftOptions = computed(() => taskSystem.value.shifts || []);
       const floorOptions = computed(() => taskSystem.value.floors || []);
+      const departmentOptions = computed(() => taskSystem.value.departments || []);
       const taskUsers = computed(() => taskSystem.value.users || []);
       const shiftSelectOptions = computed(() =>
         shiftOptions.value.map((item) => ({ value: String(item.id), label: item.name }))
@@ -840,14 +1061,38 @@
       const floorSelectOptions = computed(() =>
         floorOptions.value.map((item) => ({ value: String(item.id), label: item.name }))
       );
+      const departmentSelectOptions = computed(() =>
+        departmentOptions.value.map((item) => ({ value: item.name, label: item.name }))
+      );
       const userSelectOptions = computed(() =>
         taskUsers.value.map((item) => ({ value: item.displayLabel, label: item.displayLabel }))
+      );
+      const mentionUserSelectOptions = computed(() =>
+        taskUsers.value.map((item) => ({
+          value: item.username,
+          label: item.displayLabel && item.displayLabel !== item.username
+            ? `${item.displayLabel} / ${item.username}`
+            : item.username,
+        }))
       );
       const statusSelectOptions = computed(() =>
         (taskSystem.value.statusOptions || []).map((item) => ({ value: item, label: item }))
       );
+      const taskFormStatusSelectOptions = computed(() => {
+        const options = statusSelectOptions.value.filter((item) => item.value !== "已驳回");
+        if (taskForm.status === "已驳回") {
+          return [...options, { value: "已驳回", label: "已驳回" }];
+        }
+        return options;
+      });
       const prioritySelectOptions = computed(() =>
         (taskSystem.value.priorityOptions || []).map((item) => ({ value: item, label: item }))
+      );
+      const operationActionSelectOptions = computed(() =>
+        (taskSystem.value.operationActions || ["增加", "修改", "删除", "查看"]).map((item) => ({
+          value: item,
+          label: item,
+        }))
       );
       const handoverRecordSelectOptions = computed(() =>
         (taskSystem.value.handovers || []).map((item) => ({
@@ -897,10 +1142,12 @@
             const haystack = [
               item.title,
               item.shiftName,
+              item.receiverShiftName,
               item.floorName,
               item.handoverUser,
               item.receiverUser,
               item.receiverSupervisorLabel,
+              item.mentionUserLabels,
               item.workSummary,
               item.precautions,
               item.pendingItems,
@@ -927,6 +1174,7 @@
               item.assigneeUser,
               item.creatorUser,
               item.supervisorLabel,
+              item.mentionUserLabels,
             ]
               .join(" ")
               .toLowerCase();
@@ -956,6 +1204,21 @@
         });
         return sortRows(rows, userSort);
       });
+      const filteredOperationLogs = computed(() => {
+        const rows = (taskSystem.value.operationLogs || []).filter((item) => {
+          if (operationFilters.dateFrom && item.operatedAt.slice(0, 10) < operationFilters.dateFrom) return false;
+          if (operationFilters.dateTo && item.operatedAt.slice(0, 10) > operationFilters.dateTo) return false;
+          if (operationFilters.actionType && item.actionType !== operationFilters.actionType) return false;
+          if (operationFilters.operator) {
+            const haystack = [item.operatorUser, item.operatorLabel]
+              .join(" ")
+              .toLowerCase();
+            if (!haystack.includes(operationFilters.operator.toLowerCase())) return false;
+          }
+          return true;
+        });
+        return sortRows(rows, operationSort);
+      });
       const filteredShiftOptions = computed(() =>
         shiftOptions.value.filter((item) => {
           if (shiftFilters.keyword) {
@@ -978,6 +1241,86 @@
           return true;
         })
       );
+      const filteredDepartmentOptions = computed(() =>
+        departmentOptions.value.filter((item) => {
+          if (departmentFilters.keyword) {
+            const haystack = [item.name, item.sortOrder]
+              .join(" ")
+              .toLowerCase();
+            if (!haystack.includes(departmentFilters.keyword.toLowerCase())) return false;
+          }
+          return true;
+        })
+      );
+      const notificationItems = computed(() => {
+        const shiftItems = (taskSystem.value.reminders?.shiftReminders || []).map((item) => {
+          const id = item.reminderId || `handover:${item.handoverRecordId || item.shiftName}:${item.startTime}`;
+          return {
+            id,
+            type: "handover",
+            typeLabel: "交接班提醒",
+            title: item.reminderTitle || `${item.receiverShiftName || item.shiftName}接班提醒`,
+            description: [
+              item.handoverUser && item.receiverUser ? `${item.handoverUser} → ${item.receiverUser}` : "",
+              item.keywords || "",
+              `剩余 ${formatReminderRemaining(item)}`,
+            ].filter(Boolean).join(" / "),
+            time: item.startTime,
+            handoverRecordId: item.handoverRecordId,
+            unread: !notificationReadIds.value.has(id),
+          };
+        });
+        const taskItems = (taskSystem.value.reminders?.dueTasks || []).map((item) => {
+          const id = item.reminderId || `task:${item.id}:${item.startAt}`;
+          return {
+            id,
+            type: "task",
+            typeLabel: "任务提醒",
+            title: item.reminderTitle || item.title,
+            description: [
+              item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+              `开始时间：${formatDateTime(item.startAt)}`,
+              `剩余 ${formatReminderRemaining(item)}`,
+            ].filter(Boolean).join(" / "),
+            time: item.startAt,
+            taskId: item.id,
+            unread: !notificationReadIds.value.has(id),
+          };
+        });
+        return [...shiftItems, ...taskItems]
+          .filter((item) => item.unread)
+          .sort((left, right) => compareValues(left.time, right.time));
+      });
+      const unreadNotificationCount = computed(() => notificationItems.value.length);
+      const detailDialogTitle = computed(() => {
+        const record = detailDialogRecord.value;
+        if (!record) return "详情";
+        if (detailDialogType.value === "handover") return `交接班详情 #${record.id}`;
+        if (detailDialogType.value === "task") return `任务详情 #${record.id}`;
+        if (detailDialogType.value === "user") return `账号详情 #${record.id || record.username}`;
+        return "详情";
+      });
+      const detailDialogSubtitle = computed(() => {
+        const record = detailDialogRecord.value;
+        if (!record) return "";
+        if (detailDialogType.value === "handover") {
+          return [record.keywords, record.shiftName && record.receiverShiftName ? `${record.shiftName} → ${record.receiverShiftName}` : ""]
+            .filter(Boolean)
+            .join(" / ");
+        }
+        if (detailDialogType.value === "task") {
+          return [record.title, record.status, record.priority ? `${record.priority}优先级` : ""]
+            .filter(Boolean)
+            .join(" / ");
+        }
+        if (detailDialogType.value === "user") {
+          return [record.displayLabel, record.username, getRoleLabel(record.role)]
+            .filter(Boolean)
+            .join(" / ");
+        }
+        return "";
+      });
+      const detailDialogSections = computed(() => buildDetailDialogSections());
       const dashboardPreviewRows = computed(() => {
         const keyword = dashboardPreviewSearch.value.trim().toLowerCase();
         if (!keyword) return detailRows.value.slice(0, 8);
@@ -1498,6 +1841,8 @@
 
       const exportColumns = computed(() => pageConfig.value.exportColumns);
 
+      // === Request helpers and form reset helpers ===
+
       function getPageFromPath(pathname) {
         if (pathname === ROUTES.oc) return "oc";
         if (pathname === ROUTES.lens) return "lens";
@@ -1593,7 +1938,7 @@
         profileForm.phone = authUser.value.phone || "";
         profileForm.newPassword = "";
         profileForm.confirmPassword = "";
-        profileMessage.value = "";
+        setProfileMessage("", "error");
       }
 
       function resetHandoverForm() {
@@ -1608,6 +1953,7 @@
         handoverForm.precautions = "";
         handoverForm.pendingItems = "";
         handoverForm.keywords = "";
+        handoverForm.mentionUsers = [];
         handoverFiles.value = [];
       }
 
@@ -1631,6 +1977,7 @@
         taskForm.dueAt = "";
         taskForm.assigneeUser = "";
         taskForm.handoverRecordId = "";
+        taskForm.mentionUsers = [];
         taskFiles.value = [];
       }
 
@@ -1642,6 +1989,25 @@
       function closeTaskForm() {
         resetTaskForm();
         taskFormOpen.value = false;
+      }
+
+      function resetTaskRejectForm() {
+        taskRejectForm.taskId = "";
+        taskRejectForm.title = "";
+        taskRejectForm.reason = "";
+      }
+
+      function openTaskRejectDialog(item) {
+        resetTaskRejectForm();
+        setTaskActionMessage("", "error");
+        taskRejectForm.taskId = String(item.id || "");
+        taskRejectForm.title = item.title || "";
+        taskRejectDialogOpen.value = true;
+      }
+
+      function closeTaskRejectDialog() {
+        resetTaskRejectForm();
+        taskRejectDialogOpen.value = false;
       }
 
       function resetUserForm() {
@@ -1667,6 +2033,67 @@
       function getRoleLabel(role) {
         const option = roleSelectOptions.find((item) => item.value === role);
         return option?.label || "普通用户";
+      }
+
+      function getTaskStatusBoxClass(status) {
+        if (status === "已驳回") return "task-color-box-rejected";
+        if (status === "已完成") return "task-color-box-done";
+        if (status === "进行中") return "task-color-box-active";
+        return "task-color-box-pending";
+      }
+
+      function getTaskPriorityBoxClass(priority) {
+        if (priority === "高") return "task-color-box-high";
+        if (priority === "低") return "task-color-box-low";
+        return "task-color-box-medium";
+      }
+
+      function canClaimTask(item) {
+        return item.status === "未开始" && isCurrentUserTaskAssignee(item);
+      }
+
+      function canRejectTask(item) {
+        return !["已完成", "已驳回"].includes(item.status) && (isCurrentUserTaskAssignee(item) || isAdmin.value);
+      }
+
+      function canEditTask(item) {
+        if (isAdmin.value) return true;
+        const currentUsername = authUser.value.username || "";
+        if (!currentUsername) return false;
+        if (isCurrentUserIdentity(item.creatorUser)) return true;
+        const creator = taskUsers.value.find((user) =>
+          [user.username, user.displayName, user.displayLabel].includes(item.creatorUser)
+        );
+        return creator?.supervisorUser === currentUsername;
+      }
+
+      function isCurrentUserTaskAssignee(item) {
+        return isCurrentUserIdentity(item.assigneeUser);
+      }
+
+      function isCurrentUserIdentity(value) {
+        const normalizedValue = String(value || "").trim();
+        if (!normalizedValue) return false;
+        return [authUser.value.username, authUser.value.displayName, authUser.value.displayLabel]
+          .filter(Boolean)
+          .includes(normalizedValue);
+      }
+
+      function isImageAttachment(file) {
+        const contentType = String(file?.contentType || "").toLowerCase();
+        if (contentType.startsWith("image/")) return true;
+        return /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(String(file?.originalName || ""));
+      }
+
+      function openAttachmentPreview(file) {
+        if (!isImageAttachment(file)) return;
+        attachmentPreviewFile.value = file;
+        attachmentPreviewOpen.value = true;
+      }
+
+      function closeAttachmentPreview() {
+        attachmentPreviewOpen.value = false;
+        attachmentPreviewFile.value = null;
       }
 
       function resetShiftForm() {
@@ -1701,6 +2128,22 @@
       function closeFloorForm() {
         resetFloorForm();
         floorFormOpen.value = false;
+      }
+
+      function resetDepartmentForm() {
+        departmentForm.id = "";
+        departmentForm.name = "";
+        departmentForm.sortOrder = 0;
+      }
+
+      function openDepartmentForm() {
+        resetDepartmentForm();
+        departmentFormOpen.value = true;
+      }
+
+      function closeDepartmentForm() {
+        resetDepartmentForm();
+        departmentFormOpen.value = false;
       }
 
       function resetFilters() {
@@ -1801,6 +2244,7 @@
           isAuthenticated.value = Boolean(payload.authenticated);
           authUser.value = payload.user || authUser.value;
           if (isAuthenticated.value) {
+            loadNotificationReads();
             resetProfileForm();
           }
         } catch (errorInstance) {
@@ -1820,6 +2264,7 @@
           });
           isAuthenticated.value = true;
           authUser.value = payload.user;
+          loadNotificationReads();
           resetProfileForm();
           applyCurrentPageToState(true);
           systemMode.value = "tasks";
@@ -1840,6 +2285,8 @@
           // Ignore logout transport issues and clear local state anyway.
         }
         isAuthenticated.value = false;
+        notificationPanelOpen.value = false;
+        notificationReadIds.value = new Set();
         authUser.value = {
           username: "",
           displayName: "",
@@ -1868,8 +2315,7 @@
 
       async function saveProfile() {
         profileSaving.value = true;
-        profileMessage.value = "";
-        profileMessageTone.value = "error";
+        setProfileMessage("", "error");
 
         try {
           const payload = await requestJson("/api/profile", {
@@ -1878,19 +2324,149 @@
           });
           authUser.value = payload.user;
           resetProfileForm();
-          profileMessage.value = payload.message || "个人信息已保存。";
-          profileMessageTone.value = "success";
+          setProfileMessage(payload.message || "个人信息已保存。", "success");
         } catch (errorInstance) {
-          profileMessage.value = errorInstance instanceof Error ? errorInstance.message : String(errorInstance);
-          profileMessageTone.value = "error";
+          setProfileMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
         } finally {
           profileSaving.value = false;
         }
       }
 
+      function scheduleFlashMessageClear(messageRef, timerKey) {
+        if (flashMessageTimers[timerKey]) {
+          window.clearTimeout(flashMessageTimers[timerKey]);
+          flashMessageTimers[timerKey] = null;
+        }
+        const message = messageRef.value;
+        if (!message) return;
+
+        flashMessageTimers[timerKey] = window.setTimeout(() => {
+          if (messageRef.value === message) {
+            messageRef.value = "";
+          }
+          flashMessageTimers[timerKey] = null;
+        }, FLASH_MESSAGE_TIMEOUT_MS);
+      }
+
+      function setProfileMessage(message, tone = "success") {
+        profileMessage.value = message;
+        profileMessageTone.value = tone;
+        scheduleFlashMessageClear(profileMessage, "profile");
+      }
+
       function setTaskActionMessage(message, tone = "success") {
         taskActionMessage.value = message;
         taskActionTone.value = tone;
+        scheduleFlashMessageClear(taskActionMessage, "taskAction");
+      }
+
+      function setExportMessage(message, tone = "success") {
+        exportMessage.value = message;
+        exportMessageTone.value = tone;
+        scheduleFlashMessageClear(exportMessage, "export");
+      }
+
+      function clearFlashMessageTimers() {
+        Object.keys(flashMessageTimers).forEach((key) => {
+          if (!flashMessageTimers[key]) return;
+          window.clearTimeout(flashMessageTimers[key]);
+          flashMessageTimers[key] = null;
+        });
+      }
+
+      function clearNotificationClickTimer() {
+        if (!notificationClickTimer) return;
+        window.clearTimeout(notificationClickTimer);
+        notificationClickTimer = null;
+      }
+
+      function getNotificationReadStorageKey() {
+        return `${NOTIFICATION_READ_STORAGE_PREFIX}${authUser.value.username || "anonymous"}`;
+      }
+
+      function loadNotificationReads() {
+        const rawValue = window.localStorage.getItem(getNotificationReadStorageKey());
+        if (!rawValue) {
+          notificationReadIds.value = new Set();
+          return;
+        }
+        try {
+          const ids = JSON.parse(rawValue);
+          notificationReadIds.value = new Set(Array.isArray(ids) ? ids : []);
+        } catch (errorInstance) {
+          notificationReadIds.value = new Set();
+        }
+      }
+
+      function saveNotificationReads() {
+        window.localStorage.setItem(
+          getNotificationReadStorageKey(),
+          JSON.stringify(Array.from(notificationReadIds.value))
+        );
+      }
+
+      function toggleNotificationPanel() {
+        notificationPanelOpen.value = true;
+      }
+
+      function closeNotificationPanel() {
+        notificationPanelOpen.value = false;
+      }
+
+      function markNotificationRead(item) {
+        if (!item?.id || notificationReadIds.value.has(item.id)) return;
+        const nextIds = new Set(notificationReadIds.value);
+        nextIds.add(item.id);
+        notificationReadIds.value = nextIds;
+        saveNotificationReads();
+      }
+
+      function handleNotificationClick(item) {
+        clearNotificationClickTimer();
+        notificationClickTimer = window.setTimeout(() => {
+          markNotificationRead(item);
+          notificationClickTimer = null;
+        }, 220);
+      }
+
+      function openNotificationDetail(item) {
+        clearNotificationClickTimer();
+        if (!item) return;
+        const relatedRecord = findNotificationDetailRecord(item);
+        markNotificationRead(item);
+        closeNotificationPanel();
+        if (!relatedRecord) return;
+        if (item.type === "handover") {
+          openHandoverDetail(relatedRecord);
+          return;
+        }
+        if (item.type === "task") {
+          openTaskDetail(relatedRecord);
+        }
+      }
+
+      function findNotificationDetailRecord(item) {
+        if (item.type === "handover") {
+          const recordId = Number(item.handoverRecordId || String(item.id || "").split(":")[1]);
+          return (taskSystem.value.handovers || []).find((record) => Number(record.id) === recordId);
+        }
+        if (item.type === "task") {
+          const taskId = Number(item.taskId || String(item.id || "").split(":")[1]);
+          return (taskSystem.value.tasks || []).find((task) => Number(task.id) === taskId);
+        }
+        return null;
+      }
+
+      function formatReminderRemaining(item) {
+        if (item?.remainingText) return item.remainingText;
+        const minutesUntil = Math.max(0, Number(item?.minutesUntil || 0));
+        const totalHours = minutesUntil ? Math.ceil(minutesUntil / 60) : 0;
+        const days = Math.floor(totalHours / 24);
+        const hours = totalHours % 24;
+        return `${days}天${String(hours).padStart(2, "0")}小时`;
       }
 
       function isTaskFormIdle() {
@@ -1984,6 +2560,7 @@
         handoverForm.precautions = record.precautions;
         handoverForm.pendingItems = record.pendingItems;
         handoverForm.keywords = record.keywords;
+        handoverForm.mentionUsers = Array.isArray(record.mentionUsers) ? [...record.mentionUsers] : [];
         handoverFiles.value = [];
         taskSection.value = "handover";
         handoverFormOpen.value = true;
@@ -1999,6 +2576,7 @@
         taskForm.dueAt = (item.dueAt || "").replace(" ", "T").slice(0, 16);
         taskForm.assigneeUser = item.assigneeUser;
         taskForm.handoverRecordId = String(item.handoverRecordId || "");
+        taskForm.mentionUsers = Array.isArray(item.mentionUsers) ? [...item.mentionUsers] : [];
         taskFiles.value = [];
         taskSection.value = "tasks";
         taskFormOpen.value = true;
@@ -2016,6 +2594,208 @@
         userFormOpen.value = true;
       }
 
+      function openHandoverDetail(item) {
+        openDetailDialog("handover", item);
+      }
+
+      function openTaskDetail(item) {
+        openDetailDialog("task", item);
+      }
+
+      function openUserDetail(item) {
+        openDetailDialog("user", item);
+      }
+
+      function openDetailDialog(type, record) {
+        if (!record) return;
+        detailDialogType.value = type;
+        detailDialogRecord.value = record;
+        detailDialogOpen.value = true;
+        void recordOperationView(type, record);
+      }
+
+      function closeDetailDialog() {
+        detailDialogOpen.value = false;
+        detailDialogType.value = "";
+        detailDialogRecord.value = null;
+      }
+
+      async function recordOperationView(type, record) {
+        const meta = getDetailOperationMeta(type, record);
+        if (!meta) return;
+        try {
+          const responsePayload = await requestJson("/api/task-system/operation-logs", {
+            method: "POST",
+            body: JSON.stringify({
+              pageName: meta.pageName,
+              actionType: "查看",
+              recordLabel: meta.recordLabel,
+              recordId: meta.recordId,
+            }),
+          });
+          upsertTaskSystemItem("operationLogs", responsePayload.item);
+        } catch (errorInstance) {
+          // 查看日志失败不应该打断详情弹窗。
+        }
+      }
+
+      function getDetailOperationMeta(type, record) {
+        if (!record) return null;
+        if (type === "handover") {
+          return {
+            pageName: "交接班记录",
+            recordId: record.id,
+            recordLabel: [
+              `#${record.id}`,
+              record.keywords,
+              record.floorName,
+              record.receiverUser,
+            ].filter(Boolean).join(" / "),
+          };
+        }
+        if (type === "task") {
+          return {
+            pageName: "任务清单",
+            recordId: record.id,
+            recordLabel: [
+              `#${record.id}`,
+              record.title,
+              record.assigneeUser,
+            ].filter(Boolean).join(" / "),
+          };
+        }
+        if (type === "user") {
+          return {
+            pageName: "用户管理",
+            recordId: record.id || record.username,
+            recordLabel: [
+              `#${record.id || record.username}`,
+              record.username,
+              record.displayLabel || record.displayName,
+            ].filter(Boolean).join(" / "),
+          };
+        }
+        return null;
+      }
+
+      function buildDetailDialogSections() {
+        const record = detailDialogRecord.value;
+        if (!record) return [];
+        if (detailDialogType.value === "handover") return buildHandoverDetailSections(record);
+        if (detailDialogType.value === "task") return buildTaskDetailSections(record);
+        if (detailDialogType.value === "user") return buildUserDetailSections(record);
+        return [];
+      }
+
+      function buildHandoverDetailSections(record) {
+        return [
+          {
+            title: "基础信息",
+            fields: [
+              { label: "ID", value: detailValue(record.id) },
+              { label: "关键词", value: detailValue(record.keywords) },
+              { label: "楼层", value: detailValue(record.floorName) },
+              { label: "交班班次", value: detailValue(record.shiftName) },
+              { label: "接班班次", value: detailValue(record.receiverShiftName) },
+              { label: "创建时间", value: formatDateTime(record.createdAt || record.recordTime) },
+              { label: "更新时间", value: formatDateTime(record.updatedAt) },
+              { label: "创建人", value: detailValue(record.createdBy) },
+            ],
+          },
+          {
+            title: "交接人员",
+            fields: [
+              { label: "交班人", value: detailValue(record.handoverUser) },
+              { label: "接班人", value: detailValue(record.receiverUser) },
+              { label: "接班人主管", value: detailValue(record.receiverSupervisorLabel) },
+              { label: "@人员", value: detailValue(record.mentionUserLabels), long: true },
+            ],
+          },
+          {
+            title: "交接内容",
+            fields: [
+              { label: "当班情况", value: detailValue(record.workSummary), long: true },
+              { label: "注意事项", value: detailValue(record.precautions), long: true },
+              { label: "未完成事项", value: detailValue(record.pendingItems), long: true },
+            ],
+          },
+        ];
+      }
+
+      function buildTaskDetailSections(record) {
+        return [
+          {
+            title: "基础信息",
+            fields: [
+              { label: "ID", value: detailValue(record.id) },
+              { label: "标题", value: detailValue(record.title), long: true },
+              { label: "状态", value: detailValue(record.status) },
+              { label: "优先级", value: detailValue(record.priority) },
+              { label: "负责人", value: detailValue(record.assigneeUser) },
+              { label: "发布者", value: detailValue(record.creatorUser) },
+              { label: "主管", value: detailValue(record.supervisorLabel) },
+              { label: "@人员", value: detailValue(record.mentionUserLabels), long: true },
+            ],
+          },
+          {
+            title: "时间与关联",
+            fields: [
+              { label: "创建时间", value: formatDateTime(record.createdAt) },
+              { label: "更新时间", value: formatDateTime(record.updatedAt) },
+              { label: "开始时间", value: formatDateTime(record.startAt) },
+              { label: "到期时间", value: formatDateTime(record.dueAt) },
+              { label: "完成时间", value: formatDateTime(record.completedAt) },
+              { label: "关联交接班", value: getHandoverRecordLabel(record.handoverRecordId), long: true },
+            ],
+          },
+          {
+            title: "任务内容",
+            fields: [
+              { label: "任务描述", value: detailValue(record.description), long: true },
+              { label: "驳回人", value: detailValue(record.rejectedBy) },
+              { label: "驳回时间", value: formatDateTime(record.rejectedAt) },
+              { label: "驳回理由", value: detailValue(record.rejectReason), long: true },
+            ],
+          },
+        ];
+      }
+
+      function buildUserDetailSections(record) {
+        return [
+          {
+            title: "账号信息",
+            fields: [
+              { label: "ID", value: detailValue(record.id) },
+              { label: "工号", value: detailValue(record.username) },
+              { label: "姓名", value: detailValue(record.displayLabel || record.displayName) },
+              { label: "职位", value: getRoleLabel(record.role) },
+              { label: "权限等级", value: detailValue(record.permissionLevel) },
+              { label: "部门", value: detailValue(record.department) },
+            ],
+          },
+          {
+            title: "联系方式与组织",
+            fields: [
+              { label: "主管", value: detailValue(record.supervisorLabel || record.supervisorUser) },
+              { label: "邮箱", value: detailValue(record.email) },
+              { label: "电话", value: detailValue(record.phone) },
+              { label: "创建时间", value: formatDateTime(record.createdAt) },
+              { label: "更新时间", value: formatDateTime(record.updatedAt) },
+            ],
+          },
+        ];
+      }
+
+      function detailValue(value) {
+        if (Array.isArray(value)) {
+          const joined = value.filter(Boolean).join("、");
+          return joined || "--";
+        }
+        const normalizedValue = String(value ?? "").trim();
+        return normalizedValue || "--";
+      }
+
+      // === Task-system submit and delete handlers ===
       async function submitHandover() {
         if (!isTaskFormIdle()) return;
         if (!validateHandoverForm()) return;
@@ -2156,6 +2936,153 @@
         }
       }
 
+      async function submitDepartment() {
+        if (!isTaskFormIdle()) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson("/api/task-system/departments", {
+            method: "POST",
+            body: JSON.stringify({
+              ...departmentForm,
+              id: departmentForm.id || null,
+            }),
+          });
+          upsertTaskSystemItem("departments", responsePayload.item);
+          resetDepartmentForm();
+          departmentFormOpen.value = false;
+          setTaskActionMessage("部门设置已保存。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function deleteHandover(item) {
+        if (!isTaskFormIdle()) return;
+        const confirmed = window.confirm(`确认删除交接班记录 #${item.id}？此操作会同时删除附件。`);
+        if (!confirmed) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          await requestJson(`/api/task-system/handover-records/${item.id}`, { method: "DELETE" });
+          taskSystem.value.handovers = (taskSystem.value.handovers || []).filter(
+            (record) => Number(record.id) !== Number(item.id)
+          );
+          taskSystem.value.tasks = (taskSystem.value.tasks || []).map((task) =>
+            Number(task.handoverRecordId) === Number(item.id)
+              ? { ...task, handoverRecordId: null, handoverRecordLabel: "" }
+              : task
+          );
+          if (Number(handoverForm.id) === Number(item.id)) {
+            handoverFormOpen.value = false;
+            resetHandoverForm();
+          }
+          setTaskActionMessage("交接班记录已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function deleteTask(item) {
+        if (!isTaskFormIdle()) return;
+        const confirmed = window.confirm(`确认删除任务 #${item.id}？此操作会同时删除附件。`);
+        if (!confirmed) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          await requestJson(`/api/task-system/tasks/${item.id}`, { method: "DELETE" });
+          taskSystem.value.tasks = (taskSystem.value.tasks || []).filter(
+            (task) => Number(task.id) !== Number(item.id)
+          );
+          if (Number(taskForm.id) === Number(item.id)) {
+            taskFormOpen.value = false;
+            resetTaskForm();
+          }
+          setTaskActionMessage("任务已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function claimTask(item) {
+        if (!isTaskFormIdle()) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson(`/api/task-system/tasks/${item.id}/claim`, {
+            method: "POST",
+          });
+          upsertTaskSystemItem("tasks", responsePayload.item);
+          setTaskActionMessage("任务已领取。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function submitTaskReject() {
+        if (!isTaskFormIdle()) return;
+        const taskId = Number(taskRejectForm.taskId);
+        const reason = taskRejectForm.reason.trim();
+        if (!taskId) return;
+        if (!reason) {
+          setTaskActionMessage("请输入驳回理由。", "error");
+          return;
+        }
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson(`/api/task-system/tasks/${taskId}/reject`, {
+            method: "POST",
+            body: JSON.stringify({ reason }),
+          });
+          upsertTaskSystemItem("tasks", responsePayload.item);
+          closeTaskRejectDialog();
+          setTaskActionMessage("任务已驳回。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      function deleteCurrentHandover() {
+        if (!handoverForm.id) return;
+        void deleteHandover({ id: handoverForm.id });
+      }
+
+      function deleteCurrentTask() {
+        if (!taskForm.id) return;
+        void deleteTask({ id: taskForm.id });
+      }
+
       async function deleteShift(item) {
         if (!isTaskFormIdle()) return;
         const confirmed = window.confirm(`确认删除班次“${item.name}”？`);
@@ -2202,6 +3129,30 @@
         }
       }
 
+      async function deleteDepartment(item) {
+        if (!isTaskFormIdle()) return;
+        const confirmed = window.confirm(`确认删除部门“${item.name}”？`);
+        if (!confirmed) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          await requestJson(`/api/task-system/departments/${item.id}`, { method: "DELETE" });
+          taskSystem.value.departments = (taskSystem.value.departments || []).filter(
+            (department) => Number(department.id) !== Number(item.id)
+          );
+          setTaskActionMessage("部门已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      // === Export and data loading helpers ===
       async function downloadTaskExport(type, format) {
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -2255,7 +3206,7 @@
           exportForm.filters[field.key] = filters[field.key] || (field.key === "snapshotDate" ? "latest" : "");
         }
         exportForm.columns = pageConfig.value.exportColumns.map((item) => item.key);
-        exportMessage.value = "";
+        setExportMessage("", "error");
         exportDialogOpen.value = true;
       }
 
@@ -2282,8 +3233,7 @@
 
       async function downloadExport() {
         exportSubmitting.value = true;
-        exportMessageTone.value = "error";
-        exportMessage.value = "";
+        setExportMessage("", "error");
 
         try {
           if (!exportForm.columns.length) {
@@ -2321,15 +3271,13 @@
           link.click();
           link.remove();
           URL.revokeObjectURL(objectUrl);
-          exportMessageTone.value = "success";
-          exportMessage.value = "Excel 导出成功。";
+          setExportMessage("Excel 导出成功。", "success");
         } catch (errorInstance) {
-          exportMessageTone.value = "error";
           if (errorInstance instanceof Error && errorInstance.message === AUTH_REQUIRED_ERROR) {
-            exportMessage.value = "登录状态已失效，请重新登录。";
+            setExportMessage("登录状态已失效，请重新登录。", "error");
             await logout();
           } else {
-            exportMessage.value = errorInstance instanceof Error ? errorInstance.message : String(errorInstance);
+            setExportMessage(errorInstance instanceof Error ? errorInstance.message : String(errorInstance), "error");
           }
         } finally {
           exportSubmitting.value = false;
@@ -2395,11 +3343,16 @@
         if (!["tasks", "dashboard"].includes(mode)) return;
         systemMode.value = mode;
         window.localStorage.setItem(ACTIVE_SYSTEM_STORAGE_KEY, mode);
-        navDrawerOpen.value = false;
         syncRouteWithState(true);
         if (!isAuthenticated.value) return;
         if (mode === "tasks") {
-          await fetchTaskSystem();
+          const hasTaskSystemData =
+            (taskSystem.value.users || []).length ||
+            (taskSystem.value.handovers || []).length ||
+            (taskSystem.value.tasks || []).length;
+          if (!hasTaskSystemData) {
+            await fetchTaskSystem();
+          }
         } else if (!dashboard.value.records.length) {
           await fetchDashboard(false);
         } else {
@@ -2629,6 +3582,7 @@
         return classes;
       }
 
+      // === Shared sorting helpers ===
       function compareValues(left, right) {
         const leftEmpty = left === null || left === undefined || Number.isNaN(left);
         const rightEmpty = right === null || right === undefined || Number.isNaN(right);
@@ -2714,7 +3668,7 @@
       }
 
       function getDefaultListSortDirection(field) {
-        return ["id", "createdAt", "updatedAt"].includes(field) ? "desc" : "asc";
+        return ["id", "createdAt", "updatedAt", "operatedAt"].includes(field) ? "desc" : "asc";
       }
 
       function resetListSort(sortState) {
@@ -2794,6 +3748,23 @@
         return getListSortIndicator(userSort, field);
       }
 
+      function resetOperationSort() {
+        operationSort.splice(
+          0,
+          operationSort.length,
+          { field: "operatedAt", direction: "desc" },
+          { field: "id", direction: "desc" }
+        );
+      }
+
+      function toggleOperationSort(field, event) {
+        toggleListSort(operationSort, field, event);
+      }
+
+      function getOperationSortIndicator(field) {
+        return getListSortIndicator(operationSort, field);
+      }
+
       function getHandoverRecordLabel(recordId) {
         const normalizedId = Number(recordId);
         const record = (taskSystem.value.handovers || []).find((item) => Number(item.id) === normalizedId);
@@ -2802,7 +3773,9 @@
         return [
           `#${record.id}`,
           record.title,
-          record.shiftName,
+          record.shiftName && record.receiverShiftName
+            ? `${record.shiftName} → ${record.receiverShiftName}`
+            : record.shiftName,
           record.floorName,
           people,
           record.receiverSupervisorLabel ? `主管：${record.receiverSupervisorLabel}` : "",
@@ -2812,6 +3785,7 @@
           .join(" / ");
       }
 
+      // === Dashboard chart rendering ===
       function ensureCharts() {
         if (!window.echarts) return;
         const targets = {
@@ -3140,6 +4114,8 @@
       onBeforeUnmount(() => {
         window.removeEventListener("resize", handleResize);
         window.removeEventListener("popstate", handlePopState);
+        clearNotificationClickTimer();
+        clearFlashMessageTimers();
         disposeCharts();
       });
 
@@ -3152,6 +4128,16 @@
         loading,
         error,
         navDrawerOpen,
+        notificationPanelOpen,
+        notificationItems,
+        unreadNotificationCount,
+        attachmentPreviewOpen,
+        attachmentPreviewFile,
+        detailDialogOpen,
+        detailDialogRecord,
+        detailDialogTitle,
+        detailDialogSubtitle,
+        detailDialogSections,
         profileDialogOpen,
         profileSaving,
         profileMessage,
@@ -3182,11 +4168,15 @@
         userFilters,
         shiftFilters,
         floorFilters,
+        departmentFilters,
+        operationFilters,
         handoverForm,
         taskForm,
+        taskRejectForm,
         userForm,
         shiftForm,
         floorForm,
+        departmentForm,
         handoverFiles,
         taskFiles,
         taskActionSubmitting,
@@ -3194,12 +4184,15 @@
         taskActionTone,
         handoverFormOpen,
         taskFormOpen,
+        taskRejectDialogOpen,
         userFormOpen,
         shiftFormOpen,
         floorFormOpen,
+        departmentFormOpen,
         filteredTaskUsers,
         filteredShiftOptions,
         filteredFloorOptions,
+        filteredDepartmentOptions,
         pageConfig,
         currentRows,
         detailRows,
@@ -3210,19 +4203,25 @@
         isAdmin,
         shiftOptions,
         floorOptions,
+        departmentOptions,
         taskUsers,
         shiftSelectOptions,
         floorSelectOptions,
+        departmentSelectOptions,
         userSelectOptions,
+        mentionUserSelectOptions,
         supervisorSelectOptions,
         statusSelectOptions,
+        taskFormStatusSelectOptions,
         prioritySelectOptions,
+        operationActionSelectOptions,
         handoverRecordSelectOptions,
         roleSelectOptions,
         compareModeSelectOptions,
         chartDateModeSelectOptions,
         filteredTaskHandovers,
         filteredTaskItems,
+        filteredOperationLogs,
         dashboardPreviewRows,
         dashboardRankingRows,
         dashboardThumbnailCards,
@@ -3249,6 +4248,11 @@
         pageList: Object.values(PAGE_CONFIGS),
         login,
         logout,
+        toggleNotificationPanel,
+        closeNotificationPanel,
+        handleNotificationClick,
+        openNotificationDetail,
+        markNotificationRead,
         switchSystem,
         switchPage,
         refreshActivePage,
@@ -3262,6 +4266,18 @@
         getRiskClass,
         getRiskLabel,
         getRoleLabel,
+        getTaskStatusBoxClass,
+        getTaskPriorityBoxClass,
+        canClaimTask,
+        canRejectTask,
+        canEditTask,
+        isImageAttachment,
+        openAttachmentPreview,
+        closeAttachmentPreview,
+        openHandoverDetail,
+        openTaskDetail,
+        openUserDetail,
+        closeDetailDialog,
         formatInteger,
         formatDecimal,
         formatPercent,
@@ -3290,10 +4306,21 @@
         resetUserSort,
         toggleUserSort,
         getUserSortIndicator,
+        resetOperationSort,
+        toggleOperationSort,
+        getOperationSortIndicator,
         getHandoverRecordLabel,
         handleFileSelection,
         editHandover,
         editTask,
+        claimTask,
+        openTaskRejectDialog,
+        closeTaskRejectDialog,
+        submitTaskReject,
+        deleteHandover,
+        deleteTask,
+        deleteCurrentHandover,
+        deleteCurrentTask,
         editUser,
         openHandoverForm,
         closeHandoverForm,
@@ -3305,19 +4332,24 @@
         closeShiftForm,
         openFloorForm,
         closeFloorForm,
+        openDepartmentForm,
+        closeDepartmentForm,
         submitHandover,
         submitTask,
         submitUser,
         submitShift,
         submitFloor,
+        submitDepartment,
         deleteShift,
         deleteFloor,
+        deleteDepartment,
         downloadTaskExport,
         resetHandoverForm,
         resetTaskForm,
         resetUserForm,
         resetShiftForm,
         resetFloorForm,
+        resetDepartmentForm,
         openProfileDialog,
         closeProfileDialog,
         resetProfileForm,

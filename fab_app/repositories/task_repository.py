@@ -44,6 +44,17 @@ def ensure_task_tables() -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS DEPARTMENT_SETTING (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS HANDOVER_RECORD (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
@@ -56,6 +67,7 @@ def ensure_task_tables() -> None:
                 precautions TEXT,
                 pending_items TEXT,
                 keywords TEXT,
+                mention_users TEXT,
                 created_by TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -63,6 +75,7 @@ def ensure_task_tables() -> None:
             """
         )
         _ensure_column(connection, "HANDOVER_RECORD", "floor_id", "INTEGER")
+        _ensure_column(connection, "HANDOVER_RECORD", "mention_users", "TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS TASK_ITEM (
@@ -74,16 +87,24 @@ def ensure_task_tables() -> None:
                 start_at TEXT,
                 due_at TEXT,
                 assignee_user TEXT,
+                mention_users TEXT,
                 creator_user TEXT NOT NULL,
                 handover_record_id INTEGER,
                 reminder_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                completed_at TEXT
+                completed_at TEXT,
+                reject_reason TEXT,
+                rejected_by TEXT,
+                rejected_at TEXT
             )
             """
         )
         _ensure_column(connection, "TASK_ITEM", "start_at", "TEXT")
+        _ensure_column(connection, "TASK_ITEM", "mention_users", "TEXT")
+        _ensure_column(connection, "TASK_ITEM", "reject_reason", "TEXT")
+        _ensure_column(connection, "TASK_ITEM", "rejected_by", "TEXT")
+        _ensure_column(connection, "TASK_ITEM", "rejected_at", "TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ATTACHMENT (
@@ -101,6 +122,20 @@ def ensure_task_tables() -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS OPERATION_LOG (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                operator_user TEXT,
+                operator_label TEXT,
+                operated_at TEXT NOT NULL,
+                page_name TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                record_label TEXT NOT NULL,
+                record_id TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_handover_record_time
             ON HANDOVER_RECORD (record_time DESC)
             """
@@ -109,6 +144,24 @@ def ensure_task_tables() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_task_status_due
             ON TASK_ITEM (status, due_at)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_operation_log_time
+            ON OPERATION_LOG (operated_at DESC, id DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_operation_log_operator
+            ON OPERATION_LOG (operator_user, operated_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_operation_log_action
+            ON OPERATION_LOG (action_type, operated_at DESC)
             """
         )
         connection.commit()
@@ -234,6 +287,62 @@ def delete_floor(floor_id: int) -> None:
         connection.commit()
 
 
+def fetch_all_departments():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM DEPARTMENT_SETTING
+            ORDER BY sort_order, id
+            """
+        ).fetchall()
+
+
+def fetch_department(department_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM DEPARTMENT_SETTING WHERE id = ?",
+            (department_id,),
+        ).fetchone()
+
+
+def fetch_department_by_name(name: str):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM DEPARTMENT_SETTING WHERE name = ?",
+            (name,),
+        ).fetchone()
+
+
+def insert_department(payload: dict) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO DEPARTMENT_SETTING (
+                name,
+                sort_order,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                :name,
+                :sort_order,
+                :created_at,
+                :updated_at
+            )
+            """,
+            payload,
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def delete_department(department_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM DEPARTMENT_SETTING WHERE id = ?", (department_id,))
+        connection.commit()
+
+
 def fetch_setting_map() -> dict[str, str]:
     with get_connection() as connection:
         rows = connection.execute(
@@ -285,6 +394,7 @@ def insert_handover_record(payload: dict) -> int:
                 precautions,
                 pending_items,
                 keywords,
+                mention_users,
                 created_by,
                 created_at,
                 updated_at
@@ -300,6 +410,7 @@ def insert_handover_record(payload: dict) -> int:
                 :precautions,
                 :pending_items,
                 :keywords,
+                :mention_users,
                 :created_by,
                 :created_at,
                 :updated_at
@@ -329,6 +440,23 @@ def fetch_handover_record(record_id: int):
         ).fetchone()
 
 
+def delete_handover_record(record_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE TASK_ITEM SET handover_record_id = NULL WHERE handover_record_id = ?",
+            (record_id,),
+        )
+        connection.execute(
+            "DELETE FROM ATTACHMENT WHERE owner_type = ? AND owner_id = ?",
+            ("handover", record_id),
+        )
+        connection.execute(
+            "DELETE FROM HANDOVER_RECORD WHERE id = ?",
+            (record_id,),
+        )
+        connection.commit()
+
+
 def fetch_all_tasks():
     with get_connection() as connection:
         return connection.execute(
@@ -340,7 +468,8 @@ def fetch_all_tasks():
                     WHEN '进行中' THEN 0
                     WHEN '未开始' THEN 1
                     WHEN '已完成' THEN 2
-                    ELSE 3
+                    WHEN '已驳回' THEN 3
+                    ELSE 4
                 END,
                 due_at,
                 id DESC
@@ -360,12 +489,16 @@ def insert_task(payload: dict) -> int:
                 start_at,
                 due_at,
                 assignee_user,
+                mention_users,
                 creator_user,
                 handover_record_id,
                 reminder_at,
                 created_at,
                 updated_at,
-                completed_at
+                completed_at,
+                reject_reason,
+                rejected_by,
+                rejected_at
             )
             VALUES (
                 :title,
@@ -375,12 +508,16 @@ def insert_task(payload: dict) -> int:
                 :start_at,
                 :due_at,
                 :assignee_user,
+                :mention_users,
                 :creator_user,
                 :handover_record_id,
                 :reminder_at,
                 :created_at,
                 :updated_at,
-                :completed_at
+                :completed_at,
+                :reject_reason,
+                :rejected_by,
+                :rejected_at
             )
             """,
             payload,
@@ -414,6 +551,19 @@ def fetch_task(task_id: int):
             "SELECT * FROM TASK_ITEM WHERE id = ?",
             (task_id,),
         ).fetchone()
+
+
+def delete_task(task_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "DELETE FROM ATTACHMENT WHERE owner_type = ? AND owner_id = ?",
+            ("task", task_id),
+        )
+        connection.execute(
+            "DELETE FROM TASK_ITEM WHERE id = ?",
+            (task_id,),
+        )
+        connection.commit()
 
 
 def insert_attachment(payload: dict) -> int:
@@ -460,9 +610,62 @@ def fetch_attachments_for_owner(owner_type: str, owner_id: int):
         ).fetchall()
 
 
+def fetch_attachments_by_owner_type(owner_type: str):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM ATTACHMENT
+            WHERE owner_type = ?
+            ORDER BY owner_id, id DESC
+            """,
+            (owner_type,),
+        ).fetchall()
+
+
 def fetch_attachment(attachment_id: int):
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM ATTACHMENT WHERE id = ?",
             (attachment_id,),
         ).fetchone()
+
+
+def insert_operation_log(payload: dict) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO OPERATION_LOG (
+                operator_user,
+                operator_label,
+                operated_at,
+                page_name,
+                action_type,
+                record_label,
+                record_id
+            )
+            VALUES (
+                :operator_user,
+                :operator_label,
+                :operated_at,
+                :page_name,
+                :action_type,
+                :record_label,
+                :record_id
+            )
+            """,
+            payload,
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def fetch_all_operation_logs():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM OPERATION_LOG
+            ORDER BY operated_at DESC, id DESC
+            """
+        ).fetchall()
