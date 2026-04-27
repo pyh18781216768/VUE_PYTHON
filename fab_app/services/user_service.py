@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from uuid import uuid4
 
 from werkzeug.security import check_password_hash
 
@@ -9,7 +10,8 @@ from fab_app.repositories import user_repository
 
 DEFAULT_PASSWORD = "123456"
 DEFAULT_USERNAME = "admin"
-DEFAULT_DISPLAY_NAME = "超级管理员"
+DEFAULT_DISPLAY_NAME = "超級管理員"
+ACTIVE_SESSION_TIMEOUT_MINUTES = 12 * 60
 ROLE_PERMISSION_LEVELS = {
     "user": 1,
     "line_leader": 5,
@@ -18,10 +20,15 @@ ROLE_PERMISSION_LEVELS = {
     "admin": 5,
 }
 ROLE_ALIASES = {
+    "普通使用者": "user",
     "普通用户": "user",
+    "線組長": "line_leader",
     "线组长": "line_leader",
+    "科長": "section_chief",
     "科长": "section_chief",
+    "部長": "department_head",
     "部长": "department_head",
+    "超級管理員": "admin",
     "超级管理员": "admin",
 }
 
@@ -103,6 +110,109 @@ def authenticate_user(username: str, password: str):
     return _build_profile(row)
 
 
+def issue_login_session(username: str, client_id: str) -> str:
+    normalized_username = _normalize_text(username)
+    normalized_client_id = _normalize_text(client_id)
+    token = uuid4().hex
+    user_repository.update_active_session(
+        normalized_username,
+        token,
+        datetime.now().isoformat(timespec="seconds"),
+        normalized_client_id,
+    )
+    return token
+
+
+def has_active_login_session(username: str, client_id: str | None = None) -> bool:
+    normalized_username = _normalize_text(username)
+    normalized_client_id = _normalize_text(client_id)
+    if not normalized_username:
+        return False
+
+    row = user_repository.fetch_user(normalized_username)
+    if not row:
+        return False
+
+    token = _normalize_text(row["active_session_token"])
+    if not token:
+        return False
+
+    updated_at = _parse_datetime(row["active_session_updated_at"])
+    if not updated_at or datetime.now() - updated_at > timedelta(minutes=ACTIVE_SESSION_TIMEOUT_MINUTES):
+        user_repository.clear_active_session(normalized_username, token)
+        return False
+
+    active_client_id = _normalize_text(row["active_session_client_id"])
+    if normalized_client_id and active_client_id == normalized_client_id:
+        return False
+
+    return True
+
+
+def is_login_token_current(username: str, token: str) -> bool:
+    normalized_username = _normalize_text(username)
+    normalized_token = _normalize_text(token)
+    if not normalized_username or not normalized_token:
+        return False
+
+    row = user_repository.fetch_user(normalized_username)
+    if not row:
+        return False
+    return _normalize_text(row["active_session_token"]) == normalized_token
+
+
+def is_login_session_current(username: str, token: str, client_id: str) -> bool:
+    normalized_username = _normalize_text(username)
+    normalized_token = _normalize_text(token)
+    normalized_client_id = _normalize_text(client_id)
+    if not normalized_username or not normalized_token or not normalized_client_id:
+        return False
+
+    row = user_repository.fetch_user(normalized_username)
+    if not row:
+        return False
+    if _normalize_text(row["active_session_token"]) != normalized_token:
+        return False
+
+    active_client_id = _normalize_text(row["active_session_client_id"])
+    if not active_client_id:
+        user_repository.update_active_session(
+            normalized_username,
+            normalized_token,
+            datetime.now().isoformat(timespec="seconds"),
+            normalized_client_id,
+        )
+        return True
+    return active_client_id == normalized_client_id
+
+
+def touch_login_session(username: str, token: str, client_id: str) -> None:
+    normalized_username = _normalize_text(username)
+    normalized_token = _normalize_text(token)
+    normalized_client_id = _normalize_text(client_id)
+    if not normalized_username or not normalized_token or not normalized_client_id:
+        return
+    if not is_login_session_current(normalized_username, normalized_token, normalized_client_id):
+        return
+    user_repository.update_active_session(
+        normalized_username,
+        normalized_token,
+        datetime.now().isoformat(timespec="seconds"),
+        normalized_client_id,
+    )
+
+
+def clear_login_session(username: str, token: str | None = None, client_id: str | None = None) -> None:
+    normalized_username = _normalize_text(username)
+    if not normalized_username:
+        return
+    user_repository.clear_active_session(
+        normalized_username,
+        _normalize_text(token) or None,
+        _normalize_text(client_id) or None,
+    )
+
+
 def get_user_profile(username: str):
     normalized_username = _normalize_text(username)
     row = user_repository.fetch_user(normalized_username)
@@ -160,6 +270,16 @@ def _normalize_text(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _parse_datetime(value):
+    text = _normalize_text(value)
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _normalize_role(value) -> str:

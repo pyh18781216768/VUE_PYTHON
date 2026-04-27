@@ -52,7 +52,7 @@ def admin_required(view_func):
     def wrapped(*args, **kwargs):
         profile = get_user_summary(current_username())
         if int(profile.get("permissionLevel") or 1) < 5:
-            return jsonify({"message": "当前账号没有管理员权限。"}), 403
+            return jsonify({"message": "目前帳號沒有管理員權限。"}), 403
         return view_func(*args, **kwargs)
 
     return wrapped
@@ -64,7 +64,7 @@ def super_admin_required(view_func):
     def wrapped(*args, **kwargs):
         profile = get_user_summary(current_username())
         if profile.get("role") != "admin":
-            return jsonify({"message": "只有超级管理员可以执行该操作。"}), 403
+            return jsonify({"message": "只有超級管理員可以執行該操作。"}), 403
         return view_func(*args, **kwargs)
 
     return wrapped
@@ -111,7 +111,7 @@ def delete_task_user(username: str):
         delete_user(username, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "用户已删除。"})
+    return jsonify({"message": "使用者已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/shifts")
@@ -138,7 +138,7 @@ def delete_task_shift(shift_group_id: int):
         delete_shift_group(shift_group_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "班次已删除。"})
+    return jsonify({"message": "班次已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/floors")
@@ -165,7 +165,7 @@ def delete_task_floor(floor_id: int):
         delete_floor(floor_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "楼层已删除。"})
+    return jsonify({"message": "樓層已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/departments")
@@ -192,7 +192,7 @@ def delete_task_department(department_id: int):
         delete_department(department_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "部门已删除。"})
+    return jsonify({"message": "部門已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/settings")
@@ -249,7 +249,7 @@ def delete_handover(record_id: int):
         delete_handover_record(record_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "交接班记录已删除。"})
+    return jsonify({"message": "交接班記錄已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/tasks")
@@ -321,7 +321,7 @@ def delete_task_item(task_id: int):
         delete_task(task_id, current_username())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
-    return jsonify({"message": "任务已删除。"})
+    return jsonify({"message": "任務已刪除。"})
 
 
 @task_blueprint.get("/api/task-system/reports")
@@ -344,7 +344,7 @@ def export_task_records():
     if export_type in {"operation", "operations", "operationlogs", "operation_logs"}:
         profile = get_user_summary(current_username())
         if int(profile.get("permissionLevel") or 1) < 5:
-            return jsonify({"message": "当前账号没有导出操作日志的权限。"}), 403
+            return jsonify({"message": "目前帳號沒有匯出操作記錄的權限。"}), 403
     try:
         buffer, filename, mimetype = export_task_data(
             export_type,
@@ -388,7 +388,7 @@ def preview_task_attachment(attachment_id: int):
     filename = str(payload["filename"] or "").lower()
     image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg")
     if not content_type.startswith("image/") and not filename.endswith(image_extensions):
-        return jsonify({"message": "该附件不是图片，无法预览。"}), 400
+        return jsonify({"message": "該附件不是圖片，無法預覽。"}), 400
     preview_mimetype = content_type if content_type.startswith("image/") else mimetypes.guess_type(filename)[0]
     return send_file(
         payload["path"],
@@ -403,5 +403,5 @@ def _read_payload() -> dict:
         try:
             return json.loads(raw_payload)
         except json.JSONDecodeError as exc:
-            raise ValueError("请求数据格式错误。") from exc
+            raise ValueError("請求資料格式錯誤。") from exc
     return request.get_json(silent=True) or {}

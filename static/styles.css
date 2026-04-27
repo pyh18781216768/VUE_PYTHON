@@ -1127,7 +1127,7 @@ body::after {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.task-layout-list-only .task-table-card {
+.task-layout-list-only .task-fill-table-card {
   min-height: clamp(520px, calc(100vh - 360px), 860px);
 }
 

@@ -3,44 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AA 任务看板系统</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-11" />
+    <title>AA 任務看板系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-12" />
   </head>
   <body>
     {% raw %}
     <div id="app" v-cloak :class="['page-shell', { 'page-shell-auth': !isAuthenticated }]">
       <div v-if="authChecking" class="state-panel">
         <div class="spinner"></div>
-        <p>正在检查登录状态...</p>
+        <p>正在檢查登入狀態...</p>
       </div>
 
       <section v-else-if="!isAuthenticated" class="auth-shell">
         <article class="auth-card card">
           <div class="section-head auth-head">
             <div>
-              <h1 class="auth-title">AA 看板任务登录界面</h1>
+              <h1 class="auth-title">AA 看板任務登入介面</h1>
             </div>
           </div>
 
           <form class="auth-form" @submit.prevent="login">
             <label>
-              <span>工号</span>
+              <span>工號</span>
               <input v-model.trim="loginForm.username" type="text" autocomplete="username" placeholder="例如：admin" />
             </label>
             <label>
-              <span>密码</span>
-              <input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+              <span>密碼</span>
+              <input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="請輸入密碼" />
             </label>
             <p v-if="authMessage" class="form-feedback form-error">{{ authMessage }}</p>
             <button class="btn-primary auth-submit" type="submit" :disabled="loginSubmitting">
-              {{ loginSubmitting ? '登录中...' : '登录' }}
+              {{ loginSubmitting ? '登入中...' : '登入' }}
             </button>
           </form>
         </article>
       </section>
 
       <template v-else>
-        <button class="drawer-toggle" @click="navDrawerOpen = true">目录</button>
+        <button class="drawer-toggle" @click="navDrawerOpen = true">目錄</button>
         <div v-if="navDrawerOpen" class="drawer-backdrop" @click="navDrawerOpen = false"></div>
 
         <aside :class="['side-drawer', 'side-drawer-wide', { open: navDrawerOpen }]">
@@ -58,7 +58,7 @@
               >
                 {{ languageSwitchLabel }}
               </button>
-              <button class="drawer-close" @click="navDrawerOpen = false">关闭</button>
+              <button class="drawer-close" @click="navDrawerOpen = false">關閉</button>
             </div>
           </div>
 
@@ -68,7 +68,7 @@
               :class="['choice-chip', { active: systemMode === 'tasks' }]"
               @click="switchSystem('tasks')"
             >
-              任务系统
+              任務系統
             </button>
             <button
               type="button"
@@ -82,19 +82,19 @@
           <nav v-if="systemMode === 'tasks'" class="drawer-nav">
             <button :class="{ active: taskSection === 'handover' }" @click="taskSection = 'handover'; navDrawerOpen = false">
               <span>Shift</span>
-              <strong>交接班记录</strong>
+              <strong>交接班記錄</strong>
             </button>
             <button :class="{ active: taskSection === 'tasks' }" @click="taskSection = 'tasks'; navDrawerOpen = false">
               <span>Task</span>
-              <strong>任务跟踪</strong>
+              <strong>任務跟蹤</strong>
             </button>
             <button v-if="isAdmin" :class="{ active: taskSection === 'users' }" @click="taskSection = 'users'; navDrawerOpen = false">
               <span>Admin</span>
-              <strong>用户管理</strong>
+              <strong>使用者管理</strong>
             </button>
             <button v-if="isAdmin" :class="{ active: taskSection === 'operations' }" @click="taskSection = 'operations'; navDrawerOpen = false">
               <span>Log</span>
-              <strong>操作记录</strong>
+              <strong>操作記錄</strong>
             </button>
             <button v-if="isAdmin" :class="{ active: taskSection === 'settings' }" @click="taskSection = 'settings'; navDrawerOpen = false">
               <span>Setup</span>
@@ -146,25 +146,25 @@
                     <div class="notification-panel-head">
                       <strong>通知提醒</strong>
                       <div class="notification-panel-meta">
-                        <small>{{ unreadNotificationCount > 0 ? `未读 ${unreadNotificationCount} 条` : '暂无未读' }}</small>
+                        <small>{{ unreadNotificationCount > 0 ? `未讀 ${unreadNotificationCount} 條` : '暫無未讀' }}</small>
                         <button
                           class="notification-close"
                           type="button"
                           :disabled="readNotificationCount === 0"
                           @click="clearReadNotifications"
                         >
-                          清除已读
+                          清除已讀
                         </button>
-                        <button class="notification-close" type="button" @click="closeNotificationPanel">关闭</button>
+                        <button class="notification-close" type="button" @click="closeNotificationPanel">關閉</button>
                       </div>
                     </div>
-                    <div v-if="!notificationItems.length" class="notification-empty">当前没有提醒。</div>
+                    <div v-if="!notificationItems.length" class="notification-empty">目前沒有提醒。</div>
                     <button
                       v-for="item in notificationItems"
                       :key="item.id"
                       type="button"
                       :class="['notification-item', { unread: item.unread }]"
-                      title="单击查看详情并标记已读"
+                      title="單擊查看詳情並標記已讀"
                       @click="openNotificationDetail(item)"
                     >
                       <span class="notification-type">{{ item.typeLabel }}</span>
@@ -174,10 +174,10 @@
                 </section>
               </div>
             </div>
-            <button v-if="systemMode === 'dashboard'" class="btn-primary" @click="openExportDialog">Excel 导出</button>
+            <button v-if="systemMode === 'dashboard'" class="btn-primary" @click="openExportDialog">Excel 匯出</button>
             <button class="btn-secondary" @click="refreshActivePage">刷新</button>
-            <button class="btn-secondary" @click="openProfileDialog">个人信息</button>
-            <button class="btn-ghost" @click="logout">退出登录</button>
+            <button class="btn-secondary" @click="openProfileDialog">個人資訊</button>
+            <button class="btn-ghost" @click="logout">退出登入</button>
           </div>
         </header>
 
@@ -187,7 +187,7 @@
         </div>
 
         <div v-else-if="activeSystemError" class="state-panel state-error">
-          <h1>系统加载失败</h1>
+          <h1>系統載入失敗</h1>
           <p>{{ activeSystemError }}</p>
           <button class="btn-primary" @click="refreshActivePage">重新加载</button>
         </div>
@@ -196,7 +196,7 @@
           <header v-if="false" class="hero hero-simple">
             <div>
               <p class="eyebrow">Task System</p>
-              <h1>AA 任务看板系统</h1>
+              <h1>AA 任務看板系統</h1>
             </div>
           </header>
 
@@ -212,16 +212,16 @@
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="openHandoverForm">新增</button>
-                  <button class="btn-secondary" type="button" @click="downloadTaskExport('handover', 'excel')">导出 Excel</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('handover', 'excel')">匯出 Excel</button>
                 </div>
               </div>
               <div class="task-filter-grid">
                 <label>
                   <span>关键词</span>
-                  <input v-model.trim="handoverFilters.keyword" type="text" placeholder="搜索标题、情况、注意事项" />
+                  <input v-model.trim="handoverFilters.keyword" type="text" placeholder="搜尋標題、情況、注意事項" />
                 </label>
                 <label>
-                  <span>开始日期</span>
+                    <span>開始日期</span>
                   <input v-model="handoverFilters.dateFrom" type="date" />
                 </label>
                 <label>
@@ -250,9 +250,9 @@
                   <article class="task-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
-                    <h2>创建交接班记录</h2>
+                    <h2>建立交接班記錄</h2>
                   </div>
-                  <button class="btn-ghost" type="button" @click="closeHandoverForm">关闭</button>
+                  <button class="btn-ghost" type="button" @click="closeHandoverForm">關閉</button>
                 </div>
                 <form class="task-form-grid" @submit.prevent="submitHandover">
                   <label v-if="false">
@@ -261,22 +261,22 @@
                   </label>
                   <label>
                     <span>班次</span>
-                    <searchable-select v-model="handoverForm.shiftGroupId" :options="shiftSelectOptions" empty-label="请选择"></searchable-select>
+                    <searchable-select v-model="handoverForm.shiftGroupId" :options="shiftSelectOptions" empty-label="請選擇"></searchable-select>
                   </label>
                   <label>
-                    <span>楼层</span>
-                    <searchable-select v-model="handoverForm.floorId" :options="floorSelectOptions" empty-label="请选择"></searchable-select>
+                    <span>樓層</span>
+                    <searchable-select v-model="handoverForm.floorId" :options="floorSelectOptions" empty-label="請選擇"></searchable-select>
                   </label>
                   <label>
                     <span>接班人</span>
-                    <searchable-select v-model="handoverForm.receiverUser" :options="userSelectOptions" empty-label="请选择"></searchable-select>
+                    <searchable-select v-model="handoverForm.receiverUser" :options="userSelectOptions" empty-label="請選擇"></searchable-select>
                   </label>
                   <label class="form-span-2">
                     <span>@人员</span>
                     <multi-searchable-select
                       v-model="handoverForm.mentionUsers"
                       :options="mentionUserSelectOptions"
-                      placeholder="搜索并选择需要 @ 的人员，可多选"
+                      placeholder="搜尋並選擇需要 @ 的人員，可多選"
                     ></multi-searchable-select>
                   </label>
                   <label>
@@ -285,7 +285,7 @@
                   </label>
                   <label class="form-span-2">
                     <span>当班情况</span>
-                    <textarea v-model.trim="handoverForm.workSummary" rows="4" placeholder="记录本班运行情况"></textarea>
+                    <textarea v-model.trim="handoverForm.workSummary" rows="4" placeholder="記錄本班運行情況"></textarea>
                   </label>
                   <label>
                     <span>注意事项</span>
@@ -303,16 +303,16 @@
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button v-if="handoverForm.id" class="btn-ghost" type="button" @click="deleteCurrentHandover">删除</button>
+                    <button v-if="handoverForm.id" class="btn-ghost" type="button" @click="deleteCurrentHandover">刪除</button>
                     <button v-else class="btn-secondary" type="button" @click="resetHandoverForm">重置</button>
-                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存交接记录' }}</button>
+                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存交接記錄' }}</button>
                   </div>
                 </form>
               </article>
                 </div>
               </teleport>
 
-              <article class="card task-table-card">
+              <article class="card task-table-card task-fill-table-card">
                 <div class="section-head">
                   <div>
                     <h2>历史交接班</h2>
@@ -349,13 +349,13 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleHandoverSort('floorName', $event)">
-                            <strong>楼层</strong>
+                            <strong>樓層</strong>
                             <span>{{ getHandoverSortIndicator('floorName') }}</span>
                           </button>
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleHandoverSort('createdAt', $event)">
-                            <strong>创建时间</strong>
+                            <strong>建立時間</strong>
                             <span>{{ getHandoverSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
@@ -431,7 +431,7 @@
                         <td @dblclick.stop><button class="btn-ghost table-action" type="button" @click="editHandover(item)">编辑</button></td>
                       </tr>
                       <tr v-if="!filteredTaskHandovers.length">
-                        <td colspan="13" class="empty-cell">当前条件下没有交接班记录</td>
+                        <td colspan="13" class="empty-cell">目前條件下沒有交接班記錄</td>
                       </tr>
                     </tbody>
                   </table>
@@ -444,17 +444,17 @@
             <section class="filters card">
               <div class="section-head">
                 <div>
-                  <h2>任务查询</h2>
+                  <h2>任務查詢</h2>
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="openTaskForm">新增</button>
-                  <button class="btn-secondary" type="button" @click="downloadTaskExport('task', 'excel')">导出 Excel</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('task', 'excel')">匯出 Excel</button>
                 </div>
               </div>
               <div class="task-filter-grid">
                 <label>
                   <span>关键词</span>
-                  <input v-model.trim="taskFilters.keyword" type="text" placeholder="搜索任务标题或描述" />
+                  <input v-model.trim="taskFilters.keyword" type="text" placeholder="搜尋任務標題或描述" />
                 </label>
                 <label>
                   <span>状态</span>
@@ -474,13 +474,13 @@
                   <article class="task-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
-                    <h2>创建与分配任务</h2>
+                    <h2>建立與分配任務</h2>
                   </div>
-                  <button class="btn-ghost" type="button" @click="closeTaskForm">关闭</button>
+                  <button class="btn-ghost" type="button" @click="closeTaskForm">關閉</button>
                 </div>
                 <form class="task-form-grid" @submit.prevent="submitTask">
                   <label>
-                    <span>任务标题</span>
+                    <span>任務標題</span>
                     <input v-model.trim="taskForm.title" type="text" placeholder="例如：跟进异常参数" />
                   </label>
                   <label>
@@ -500,24 +500,24 @@
                     <multi-searchable-select
                       v-model="taskForm.mentionUsers"
                       :options="mentionUserSelectOptions"
-                      placeholder="搜索并选择需要 @ 的人员，可多选"
+                      placeholder="搜尋並選擇需要 @ 的人員，可多選"
                     ></multi-searchable-select>
                   </label>
                   <label>
-                    <span>开始时间</span>
+                    <span>開始時間</span>
                     <input v-model="taskForm.startAt" type="datetime-local" />
                   </label>
                   <label>
-                    <span>到期时间</span>
+                    <span>到期時間</span>
                     <input v-model="taskForm.dueAt" type="datetime-local" />
                   </label>
                   <label class="form-span-2">
-                    <span>关联交接班记录</span>
+                    <span>關聯交接班記錄</span>
                     <searchable-select v-model="taskForm.handoverRecordId" :options="handoverRecordSelectOptions" empty-label="不关联"></searchable-select>
                   </label>
                   <label class="form-span-2">
-                    <span>任务说明</span>
-                    <textarea v-model.trim="taskForm.description" rows="5" placeholder="输入任务背景、处理步骤与要求"></textarea>
+                    <span>任務說明</span>
+                    <textarea v-model.trim="taskForm.description" rows="5" placeholder="輸入任務背景、處理步驟與要求"></textarea>
                   </label>
                   <label class="form-span-2">
                     <span>附件上传</span>
@@ -527,9 +527,9 @@
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button v-if="taskForm.id" class="btn-ghost" type="button" @click="deleteCurrentTask">删除</button>
+                    <button v-if="taskForm.id" class="btn-ghost" type="button" @click="deleteCurrentTask">刪除</button>
                     <button v-else class="btn-secondary" type="button" @click="resetTaskForm">重置</button>
-                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存任务' }}</button>
+                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存任務' }}</button>
                   </div>
                 </form>
               </article>
@@ -542,22 +542,22 @@
                   <article class="task-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>驳回任务</h2>
+                        <h2>駁回任務</h2>
                         <p v-if="taskRejectForm.title">{{ taskRejectForm.title }}</p>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeTaskRejectDialog">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeTaskRejectDialog">關閉</button>
                     </div>
                     <form class="task-form-grid" @submit.prevent="submitTaskReject">
                       <label class="form-span-2">
-                        <span>驳回理由</span>
-                        <textarea v-model.trim="taskRejectForm.reason" rows="5" placeholder="请输入驳回原因、需要补充的信息或处理建议"></textarea>
+                        <span>駁回理由</span>
+                        <textarea v-model.trim="taskRejectForm.reason" rows="5" placeholder="請輸入駁回原因、需要補充的資訊或處理建議"></textarea>
                       </label>
                       <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
                         {{ taskActionMessage }}
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="closeTaskRejectDialog">取消</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '驳回中...' : '确认驳回' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '駁回中...' : '確認駁回' }}</button>
                       </div>
                     </form>
                   </article>
@@ -570,15 +570,15 @@
                   <article class="task-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>提交任务审核</h2>
+                        <h2>提交任務審核</h2>
                         <p v-if="taskSubmitForm.title">{{ taskSubmitForm.title }}</p>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeTaskSubmitDialog">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeTaskSubmitDialog">關閉</button>
                     </div>
                     <form class="task-form-grid" @submit.prevent="submitTaskReviewRequest">
                       <label class="form-span-2">
-                        <span>提交内容</span>
-                        <textarea v-model.trim="taskSubmitForm.content" rows="6" placeholder="填写处理结果、现场情况、结论或需要审核人关注的内容"></textarea>
+                        <span>提交內容</span>
+                        <textarea v-model.trim="taskSubmitForm.content" rows="6" placeholder="填寫處理結果、現場情況、結論或需要審核人關注的內容"></textarea>
                       </label>
                       <label class="form-span-2">
                         <span>回复附件</span>
@@ -589,7 +589,7 @@
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="closeTaskSubmitDialog">取消</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交审核' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交審核' }}</button>
                       </div>
                     </form>
                   </article>
@@ -602,36 +602,36 @@
                   <article class="task-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>任务审核评分</h2>
+                        <h2>任務審核評分</h2>
                         <p v-if="taskReviewForm.title">{{ taskReviewForm.title }}</p>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeTaskReviewDialog">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeTaskReviewDialog">關閉</button>
                     </div>
                     <form class="task-form-grid" @submit.prevent="submitTaskReviewScore">
                       <label>
-                        <span>评分</span>
+                        <span>評分</span>
                         <input v-model="taskReviewForm.score" type="number" min="0" max="100" step="1" placeholder="0-100" />
                       </label>
                       <label class="form-span-2">
-                        <span>评语</span>
-                        <textarea v-model.trim="taskReviewForm.comment" rows="5" placeholder="填写通过理由、扣分点或需要补充的事项"></textarea>
+                        <span>評語</span>
+                        <textarea v-model.trim="taskReviewForm.comment" rows="5" placeholder="填寫通過理由、扣分點或需要補充的事項"></textarea>
                       </label>
                       <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
                         {{ taskActionMessage }}
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="closeTaskReviewDialog">取消</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交评分' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交評分' }}</button>
                       </div>
                     </form>
                   </article>
                 </div>
               </teleport>
 
-              <article class="card task-table-card">
+              <article class="card task-table-card task-fill-table-card">
                 <div class="section-head">
                   <div>
-                    <h2>任务清单</h2>
+                    <h2>任務清單</h2>
                   </div>
                   <button class="btn-secondary" type="button" @click="resetTaskSort">重置排序</button>
                 </div>
@@ -671,19 +671,19 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleTaskSort('createdAt', $event)">
-                            <strong>创建时间</strong>
+                            <strong>建立時間</strong>
                             <span>{{ getTaskSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleTaskSort('startAt', $event)">
-                            <strong>开始时间</strong>
+                            <strong>開始時間</strong>
                             <span>{{ getTaskSortIndicator('startAt') }}</span>
                           </button>
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleTaskSort('dueAt', $event)">
-                            <strong>到期时间</strong>
+                            <strong>到期時間</strong>
                             <span>{{ getTaskSortIndicator('dueAt') }}</span>
                           </button>
                         </th>
@@ -707,11 +707,11 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleTaskSort('rejectReason', $event)">
-                            <strong>驳回理由</strong>
+                            <strong>駁回理由</strong>
                             <span>{{ getTaskSortIndicator('rejectReason') }}</span>
                           </button>
                         </th>
-                        <th>审核</th>
+                        <th>審核</th>
                         <th>附件</th>
                         <th>操作</th>
                       </tr>
@@ -769,14 +769,14 @@
                           <div class="task-action-buttons">
                             <button v-if="canClaimTask(item)" class="btn-secondary table-action" type="button" @click="claimTask(item)">领取</button>
                             <button v-if="canSubmitTask(item)" class="btn-secondary table-action" type="button" @click="openTaskSubmitDialog(item)">提交</button>
-                            <button v-if="canReviewTask(item)" class="btn-secondary table-action" type="button" @click="openTaskReviewDialog(item)">评分</button>
-                            <button v-if="canRejectTask(item)" class="btn-ghost table-action" type="button" @click="openTaskRejectDialog(item)">驳回</button>
+                            <button v-if="canReviewTask(item)" class="btn-secondary table-action" type="button" @click="openTaskReviewDialog(item)">評分</button>
+                            <button v-if="canRejectTask(item)" class="btn-ghost table-action" type="button" @click="openTaskRejectDialog(item)">駁回</button>
                             <button v-if="canEditTask(item)" class="btn-ghost table-action" type="button" @click="editTask(item)">编辑</button>
                           </div>
                         </td>
                       </tr>
                       <tr v-if="!filteredTaskItems.length">
-                        <td colspan="15" class="empty-cell">当前条件下没有任务数据</td>
+                        <td colspan="15" class="empty-cell">目前條件下沒有任務資料</td>
                       </tr>
                     </tbody>
                   </table>
@@ -789,14 +789,14 @@
             <section class="filters card">
               <div class="section-head">
                 <div>
-                  <h2>用户查询</h2>
+                  <h2>使用者查詢</h2>
                 </div>
                 <button class="btn-secondary" type="button" @click="openUserForm">新增</button>
               </div>
               <div class="task-filter-grid">
                 <label>
                   <span>关键词</span>
-                  <input v-model.trim="userFilters.keyword" type="text" placeholder="搜索工号、姓名、部门、邮箱、电话" />
+                  <input v-model.trim="userFilters.keyword" type="text" placeholder="搜尋工號、姓名、部門、信箱、電話" />
                 </label>
                 <label>
                   <span>职位</span>
@@ -812,9 +812,9 @@
                   <article class="task-entry-dialog user-entry-dialog card task-form-card" @click.stop>
                 <div class="section-head">
                   <div>
-                    <h2>用户管理</h2>
+                    <h2>使用者管理</h2>
                   </div>
-                  <button class="btn-ghost" type="button" @click="closeUserForm">关闭</button>
+                  <button class="btn-ghost" type="button" @click="closeUserForm">關閉</button>
                 </div>
                 <form class="task-form-grid user-form-grid" @submit.prevent="submitUser">
                   <label>
@@ -831,7 +831,7 @@
                   </label>
                   <label v-else>
                     <span>职位</span>
-                    <input :value="getRoleLabel(userForm.role)" type="text" readonly title="只有超级管理员可以赋予权限" />
+                    <input :value="getRoleLabel(userForm.role)" type="text" readonly title="只有超級管理員可以賦予權限" />
                   </label>
                   <label>
                     <span>邮箱</span>
@@ -842,20 +842,20 @@
                     <input v-model.trim="userForm.phone" type="text" />
                   </label>
                   <label>
-                    <span>部门</span>
-                    <searchable-select v-model="userForm.department" :options="departmentSelectOptions" empty-label="请选择"></searchable-select>
+                    <span>部門</span>
+                    <searchable-select v-model="userForm.department" :options="departmentSelectOptions" empty-label="請選擇"></searchable-select>
                   </label>
                   <label>
-                    <span>密码</span>
-                    <input v-model="userForm.password" type="password" placeholder="新建必填，编辑留空不改" />
+                    <span>密碼</span>
+                    <input v-model="userForm.password" type="password" placeholder="新建必填，編輯留空不改" />
                   </label>
                   <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button v-if="userForm.originalUsername" class="btn-ghost" type="button" @click="deleteCurrentUser">删除</button>
+                    <button v-if="userForm.originalUsername" class="btn-ghost" type="button" @click="deleteCurrentUser">刪除</button>
                     <button v-else class="btn-secondary" type="button" @click="resetUserForm">重置</button>
-                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存用户' }}</button>
+                    <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存使用者' }}</button>
                   </div>
                 </form>
               </article>
@@ -868,13 +868,13 @@
                   <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>赋予用户权限</h2>
+                        <h2>賦予使用者權限</h2>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closePermissionForm">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closePermissionForm">關閉</button>
                     </div>
                     <form class="task-form-grid settings-form-grid" @submit.prevent="submitPermission">
                       <label>
-                        <span>工号</span>
+                        <span>工號</span>
                         <input :value="permissionForm.username" type="text" readonly />
                       </label>
                       <label>
@@ -882,11 +882,11 @@
                         <input :value="permissionForm.displayLabel" type="text" readonly />
                       </label>
                       <label>
-                        <span>当前权限</span>
+                        <span>目前權限</span>
                         <input :value="getRoleLabel(permissionForm.currentRole)" type="text" readonly />
                       </label>
                       <label>
-                        <span>赋予权限</span>
+                        <span>賦予權限</span>
                         <searchable-select v-model="permissionForm.role" :options="roleSelectOptions" :allow-empty="false"></searchable-select>
                       </label>
                       <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
@@ -894,14 +894,14 @@
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="closePermissionForm">取消</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存权限' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存權限' }}</button>
                       </div>
                     </form>
                   </article>
                 </div>
               </teleport>
 
-              <article class="card task-table-card">
+              <article class="card task-table-card task-fill-table-card">
                 <div class="section-head">
                   <div>
                     <h2>账号列表</h2>
@@ -938,7 +938,7 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleUserSort('createdAt', $event)">
-                            <strong>创建时间</strong>
+                            <strong>建立時間</strong>
                             <span>{{ getUserSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
@@ -968,12 +968,12 @@
                         <td @dblclick.stop>
                           <div class="task-action-buttons">
                             <button class="btn-ghost table-action" type="button" @click="editUser(item)">编辑</button>
-                            <button v-if="isSuperAdmin" class="btn-secondary table-action" type="button" @click="openPermissionForm(item)">权限</button>
+                            <button v-if="isSuperAdmin" class="btn-secondary table-action" type="button" @click="openPermissionForm(item)">權限</button>
                           </div>
                         </td>
                       </tr>
                       <tr v-if="!filteredTaskUsers.length">
-                        <td colspan="7" class="empty-cell">当前条件下没有用户数据</td>
+                        <td colspan="7" class="empty-cell">目前條件下沒有使用者資料</td>
                       </tr>
                     </tbody>
                   </table>
@@ -986,20 +986,20 @@
             <section class="filters card">
               <div class="section-head">
                 <div>
-                  <h2>操作记录查询</h2>
+                  <h2>操作記錄查詢</h2>
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="resetOperationSort">重置排序</button>
-                  <button class="btn-secondary" type="button" @click="downloadTaskExport('operation', 'excel')">导出 Excel</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('operation', 'excel')">匯出 Excel</button>
                 </div>
               </div>
               <div class="task-filter-grid">
                 <label>
                   <span>操作人</span>
-                  <input v-model.trim="operationFilters.operator" type="text" placeholder="搜索工号或姓名" />
+                  <input v-model.trim="operationFilters.operator" type="text" placeholder="搜尋工號或姓名" />
                 </label>
                 <label>
-                  <span>开始日期</span>
+                  <span>開始日期</span>
                   <input v-model="operationFilters.dateFrom" type="date" />
                 </label>
                 <label>
@@ -1017,7 +1017,7 @@
               <article class="card task-table-card">
                 <div class="section-head">
                   <div>
-                    <h2>操作记录列表</h2>
+                    <h2>操作記錄列表</h2>
                   </div>
                 </div>
                 <div class="table-wrap">
@@ -1038,13 +1038,13 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleOperationSort('operatedAt', $event)">
-                            <strong>操作时间</strong>
+                            <strong>操作時間</strong>
                             <span>{{ getOperationSortIndicator('operatedAt') }}</span>
                           </button>
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleOperationSort('pageName', $event)">
-                            <strong>操作页面</strong>
+                            <strong>操作頁面</strong>
                             <span>{{ getOperationSortIndicator('pageName') }}</span>
                           </button>
                         </th>
@@ -1056,7 +1056,7 @@
                         </th>
                         <th>
                           <button class="sort-button" type="button" @click="toggleOperationSort('recordLabel', $event)">
-                            <strong>操作了哪条记录</strong>
+                            <strong>操作了哪條記錄</strong>
                             <span>{{ getOperationSortIndicator('recordLabel') }}</span>
                           </button>
                         </th>
@@ -1072,7 +1072,7 @@
                         <td :title="item.recordLabel">{{ item.recordLabel || item.recordId || '--' }}</td>
                       </tr>
                       <tr v-if="!filteredOperationLogs.length">
-                        <td colspan="6" class="empty-cell">当前条件下没有操作记录。</td>
+                        <td colspan="6" class="empty-cell">目前條件下沒有操作記錄。</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1092,7 +1092,7 @@
               <div class="task-filter-grid">
                 <label>
                   <span>关键词</span>
-                  <input v-model.trim="shiftFilters.keyword" type="text" placeholder="搜索班次名称、时间、排序" />
+                  <input v-model.trim="shiftFilters.keyword" type="text" placeholder="搜尋班次名稱、時間、排序" />
                 </label>
               </div>
             </section>
@@ -1106,7 +1106,7 @@
                       <div>
                         <h2>新增班次</h2>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeShiftForm">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeShiftForm">關閉</button>
                     </div>
                     <form class="task-form-grid settings-form-grid" @submit.prevent="submitShift">
                       <label>
@@ -1114,7 +1114,7 @@
                         <input v-model.trim="shiftForm.name" type="text" />
                       </label>
                       <label>
-                        <span>开始时间</span>
+                        <span>開始時間</span>
                         <input v-model="shiftForm.startTime" type="time" />
                       </label>
                       <label>
@@ -1130,7 +1130,7 @@
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="resetShiftForm">重置</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存班次' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存班次' }}</button>
                       </div>
                     </form>
                   </article>
@@ -1148,7 +1148,7 @@
                     <thead>
                       <tr>
                         <th>班次</th>
-                        <th>开始</th>
+                        <th>開始</th>
                         <th>结束</th>
                         <th>排序</th>
                         <th>操作</th>
@@ -1160,10 +1160,10 @@
                         <td>{{ item.startTime }}</td>
                         <td>{{ item.endTime }}</td>
                         <td>{{ item.sortOrder }}</td>
-                        <td><button class="btn-ghost table-action" type="button" @click="deleteShift(item)">删除</button></td>
+                        <td><button class="btn-ghost table-action" type="button" @click="deleteShift(item)">刪除</button></td>
                       </tr>
                       <tr v-if="!filteredShiftOptions.length">
-                        <td colspan="5" class="empty-cell">当前条件下没有班次数据</td>
+                        <td colspan="5" class="empty-cell">目前條件下沒有班次資料</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1173,14 +1173,14 @@
               <section class="filters card">
                 <div class="section-head">
                   <div>
-                    <h2>楼层查询</h2>
+                    <h2>樓層查詢</h2>
                   </div>
                   <button class="btn-secondary" type="button" @click="openFloorForm">新增</button>
                 </div>
                 <div class="task-filter-grid">
                   <label>
                     <span>关键词</span>
-                    <input v-model.trim="floorFilters.keyword" type="text" placeholder="搜索楼层名称、排序" />
+                    <input v-model.trim="floorFilters.keyword" type="text" placeholder="搜尋樓層名稱、排序" />
                   </label>
                 </div>
               </section>
@@ -1191,13 +1191,13 @@
                   <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>新增楼层</h2>
+                        <h2>新增樓層</h2>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeFloorForm">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeFloorForm">關閉</button>
                     </div>
                     <form class="task-form-grid settings-form-grid" @submit.prevent="submitFloor">
                       <label>
-                        <span>楼层名称</span>
+                        <span>樓層名稱</span>
                         <input v-model.trim="floorForm.name" type="text" placeholder="例如：1F / 二楼 / A栋3层" />
                       </label>
                       <label>
@@ -1209,7 +1209,7 @@
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="resetFloorForm">重置</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存楼层' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存樓層' }}</button>
                       </div>
                     </form>
                   </article>
@@ -1219,16 +1219,16 @@
               <article class="card task-table-card">
                 <div class="section-head">
                   <div>
-                    <h2>楼层列表</h2>
+                    <h2>樓層列表</h2>
                   </div>
                 </div>
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>楼层</th>
+                        <th>樓層</th>
                         <th>排序</th>
-                        <th>创建时间</th>
+                        <th>建立時間</th>
                         <th>操作</th>
                       </tr>
                     </thead>
@@ -1237,10 +1237,10 @@
                         <td>{{ item.name }}</td>
                         <td>{{ item.sortOrder }}</td>
                         <td>{{ formatDateTime(item.createdAt) }}</td>
-                        <td><button class="btn-ghost table-action" type="button" @click="deleteFloor(item)">删除</button></td>
+                        <td><button class="btn-ghost table-action" type="button" @click="deleteFloor(item)">刪除</button></td>
                       </tr>
                       <tr v-if="!filteredFloorOptions.length">
-                        <td colspan="4" class="empty-cell">当前条件下没有楼层数据</td>
+                        <td colspan="4" class="empty-cell">目前條件下沒有樓層資料</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1250,14 +1250,14 @@
               <section class="filters card">
                 <div class="section-head">
                   <div>
-                    <h2>部门查询</h2>
+                    <h2>部門查詢</h2>
                   </div>
                   <button class="btn-secondary" type="button" @click="openDepartmentForm">新增</button>
                 </div>
                 <div class="task-filter-grid">
                   <label>
                     <span>关键词</span>
-                    <input v-model.trim="departmentFilters.keyword" type="text" placeholder="搜索部门名称、排序" />
+                    <input v-model.trim="departmentFilters.keyword" type="text" placeholder="搜尋部門名稱、排序" />
                   </label>
                 </div>
               </section>
@@ -1268,13 +1268,13 @@
                   <article class="task-entry-dialog settings-entry-dialog card task-form-card" @click.stop>
                     <div class="section-head">
                       <div>
-                        <h2>新增部门</h2>
+                        <h2>新增部門</h2>
                       </div>
-                      <button class="btn-ghost" type="button" @click="closeDepartmentForm">关闭</button>
+                      <button class="btn-ghost" type="button" @click="closeDepartmentForm">關閉</button>
                     </div>
                     <form class="task-form-grid settings-form-grid" @submit.prevent="submitDepartment">
                       <label>
-                        <span>部门名称</span>
+                        <span>部門名稱</span>
                         <input v-model.trim="departmentForm.name" type="text" placeholder="例如：AA PE / 设备维护" />
                       </label>
                       <label>
@@ -1286,7 +1286,7 @@
                       </p>
                       <div class="profile-actions form-span-2">
                         <button class="btn-secondary" type="button" @click="resetDepartmentForm">重置</button>
-                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存部门' }}</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '儲存中...' : '儲存部門' }}</button>
                       </div>
                     </form>
                   </article>
@@ -1296,16 +1296,16 @@
               <article class="card task-table-card">
                 <div class="section-head">
                   <div>
-                    <h2>部门列表</h2>
+                    <h2>部門列表</h2>
                   </div>
                 </div>
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>部门</th>
+                        <th>部門</th>
                         <th>排序</th>
-                        <th>创建时间</th>
+                        <th>建立時間</th>
                         <th>操作</th>
                       </tr>
                     </thead>
@@ -1314,10 +1314,10 @@
                         <td>{{ item.name }}</td>
                         <td>{{ item.sortOrder }}</td>
                         <td>{{ formatDateTime(item.createdAt) }}</td>
-                        <td><button class="btn-ghost table-action" type="button" @click="deleteDepartment(item)">删除</button></td>
+                        <td><button class="btn-ghost table-action" type="button" @click="deleteDepartment(item)">刪除</button></td>
                       </tr>
                       <tr v-if="!filteredDepartmentOptions.length">
-                        <td colspan="4" class="empty-cell">当前条件下没有部门数据</td>
+                        <td colspan="4" class="empty-cell">目前條件下沒有部門資料</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1339,14 +1339,14 @@
                 <button v-if="dashboardGalleryView === 'detail'" class="btn-secondary" type="button" @click="backToThumbnailGrid">
                   返回缩略图
                 </button>
-                <button class="btn-primary" type="button" @click="openExportDialog">Excel 导出</button>
+                <button class="btn-primary" type="button" @click="openExportDialog">Excel 匯出</button>
               </div>
             </div>
 
             <div v-if="dashboardGalleryView === 'grid'" class="dashboard-thumbnail-toolbar-grid">
               <label class="preview-search">
-                <span>搜索缩略图</span>
-                <input v-model.trim="dashboardPreviewSearch" type="text" placeholder="搜索项目、机台、参数、配置" />
+                <span>搜尋縮略圖</span>
+                <input v-model.trim="dashboardPreviewSearch" type="text" placeholder="搜尋項目、機台、參數、配置" />
               </label>
               <label>
                 <span>快照日期</span>
@@ -1357,7 +1357,7 @@
                 ></searchable-select>
               </label>
               <div class="thumbnail-summary-block">
-                <span>当前页</span>
+                <span>目前頁</span>
                 <strong>{{ dashboardGalleryPage }} / {{ dashboardThumbnailPageCount }}</strong>
               </div>
               <div class="thumbnail-summary-block">
@@ -1415,7 +1415,7 @@
             </button>
 
             <article v-if="!dashboardVisibleThumbnails.length" class="card thumbnail-empty">
-              <strong>当前没有可显示的缩略图</strong>
+              <strong>目前沒有可顯示的縮略圖</strong>
             </article>
           </section>
 
@@ -1565,7 +1565,7 @@
                     </label>
                     <template v-else>
                       <label>
-                        <span>开始日期</span>
+                        <span>開始日期</span>
                         <searchable-select
                           v-model="chartDateFilter.startDate"
                           :options="chartAvailableDateOptions"
@@ -1637,7 +1637,7 @@
               <div>
                 <h2>个人信息</h2>
               </div>
-              <button class="btn-ghost" @click="closeProfileDialog">关闭</button>
+              <button class="btn-ghost" @click="closeProfileDialog">關閉</button>
             </div>
 
             <form class="profile-form" @submit.prevent="saveProfile">
@@ -1648,31 +1648,31 @@
                 </label>
                 <label>
                   <span>姓名</span>
-                  <input v-model.trim="profileForm.displayName" type="text" placeholder="请输入姓名" />
+                  <input v-model.trim="profileForm.displayName" type="text" placeholder="請輸入姓名" />
                 </label>
                 <label>
-                  <span>部门</span>
-                  <input v-model.trim="profileForm.department" type="text" placeholder="请输入部门" />
+                  <span>部門</span>
+                  <input v-model.trim="profileForm.department" type="text" placeholder="請輸入部門" />
                 </label>
                 <label>
                   <span>主管</span>
-                  <searchable-select v-model="profileForm.supervisorUser" :options="supervisorSelectOptions" empty-label="请选择"></searchable-select>
+                  <searchable-select v-model="profileForm.supervisorUser" :options="supervisorSelectOptions" empty-label="請選擇"></searchable-select>
                 </label>
                 <label>
                   <span>邮箱</span>
-                  <input v-model.trim="profileForm.email" type="email" placeholder="请输入邮箱" />
+                  <input v-model.trim="profileForm.email" type="email" placeholder="請輸入信箱" />
                 </label>
                 <label>
                   <span>电话</span>
-                  <input v-model.trim="profileForm.phone" type="text" placeholder="请输入电话" />
+                  <input v-model.trim="profileForm.phone" type="text" placeholder="請輸入電話" />
                 </label>
                 <label>
-                  <span>新密码</span>
-                  <input v-model="profileForm.newPassword" type="password" placeholder="留空则不修改密码" />
+                  <span>新密碼</span>
+                  <input v-model="profileForm.newPassword" type="password" placeholder="留空則不修改密碼" />
                 </label>
                 <label>
-                  <span>确认新密码</span>
-                  <input v-model="profileForm.confirmPassword" type="password" placeholder="再次输入新密码" />
+                  <span>確認新密碼</span>
+                  <input v-model="profileForm.confirmPassword" type="password" placeholder="再次輸入新密碼" />
                 </label>
               </div>
 
@@ -1683,7 +1683,7 @@
               <div class="profile-actions">
                 <button class="btn-secondary" type="button" @click="resetProfileForm">重置</button>
                 <button class="btn-primary" type="submit" :disabled="profileSaving">
-                  {{ profileSaving ? '保存中...' : '保存修改' }}
+                  {{ profileSaving ? '儲存中...' : '儲存修改' }}
                 </button>
               </div>
             </form>
@@ -1695,13 +1695,13 @@
           <section class="export-dialog card">
             <div class="section-head">
               <div>
-                <h2>Excel 导出</h2>
+                <h2>Excel 匯出</h2>
               </div>
-              <button class="btn-ghost" @click="closeExportDialog">关闭</button>
+              <button class="btn-ghost" @click="closeExportDialog">關閉</button>
             </div>
 
             <div class="choice-group">
-              <button type="button" class="choice-chip active" disabled>当前看板：{{ pageConfig.navLabel }}</button>
+              <button type="button" class="choice-chip active" disabled>目前看板：{{ pageConfig.navLabel }}</button>
             </div>
 
             <div class="export-grid">
@@ -1718,7 +1718,7 @@
             <section class="card export-columns">
               <div class="section-head">
                 <div>
-                  <h2>导出字段</h2>
+                  <h2>匯出欄位</h2>
                 </div>
                 <button class="btn-secondary" type="button" @click="resetExportForm">恢复默认</button>
               </div>
@@ -1748,7 +1748,7 @@
             <div class="profile-actions">
               <button class="btn-secondary" type="button" @click="resetExportForm">重置筛选</button>
               <button class="btn-primary" type="button" :disabled="exportSubmitting" @click="downloadExport">
-                {{ exportSubmitting ? '导出中...' : '开始导出' }}
+                {{ exportSubmitting ? '匯出中...' : '開始匯出' }}
               </button>
             </div>
           </section>
@@ -1762,7 +1762,7 @@
                 <h2>{{ detailDialogTitle }}</h2>
                 <p v-if="detailDialogSubtitle">{{ detailDialogSubtitle }}</p>
               </div>
-              <button class="btn-ghost" type="button" @click="closeDetailDialog">关闭</button>
+              <button class="btn-ghost" type="button" @click="closeDetailDialog">關閉</button>
             </div>
 
             <div class="detail-dialog-body">
@@ -1835,7 +1835,7 @@
                 <h2>图片预览</h2>
                 <p>{{ attachmentPreviewFile.originalName }}</p>
               </div>
-              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">关闭</button>
+              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">關閉</button>
             </div>
             <img
               class="attachment-preview-image"
@@ -1844,7 +1844,7 @@
             />
             <div class="profile-actions">
               <a :href="attachmentPreviewFile.downloadUrl" class="btn-secondary attachment-preview-download" download>下载</a>
-              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">关闭预览</button>
+              <button class="btn-ghost" type="button" @click="closeAttachmentPreview">關閉預覽</button>
             </div>
           </section>
         </div>
@@ -1854,6 +1854,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-10"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-15"></script>
   </body>
 </html>

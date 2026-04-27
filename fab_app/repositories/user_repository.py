@@ -16,6 +16,9 @@ USER_COLUMNS = {
     "shift_group_id": "INTEGER",
     "created_at": "TEXT",
     "updated_at": "TEXT",
+    "active_session_token": "TEXT",
+    "active_session_client_id": "TEXT",
+    "active_session_updated_at": "TEXT",
 }
 
 
@@ -35,7 +38,10 @@ def ensure_user_table() -> None:
                 is_active INTEGER DEFAULT 1,
                 shift_group_id INTEGER,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                active_session_token TEXT,
+                active_session_client_id TEXT,
+                active_session_updated_at TEXT
             )
             """
         )
@@ -69,7 +75,10 @@ def fetch_all_users():
                 is_active,
                 shift_group_id,
                 created_at,
-                updated_at
+                updated_at,
+                active_session_token,
+                active_session_client_id,
+                active_session_updated_at
             FROM USER
             ORDER BY created_at DESC, rowid DESC
             """
@@ -93,7 +102,10 @@ def fetch_user(username: str):
                 is_active,
                 shift_group_id,
                 created_at,
-                updated_at
+                updated_at,
+                active_session_token,
+                active_session_client_id,
+                active_session_updated_at
             FROM USER
             WHERE user = ?
             """,
@@ -157,6 +169,59 @@ def update_user_by_username(username: str, payload: dict) -> None:
             f"UPDATE USER SET {assignments} WHERE user = :user",
             payload,
         )
+        connection.commit()
+
+
+def update_active_session(username: str, token: str, updated_at: str, client_id: str = "") -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE USER
+            SET active_session_token = ?,
+                active_session_client_id = ?,
+                active_session_updated_at = ?
+            WHERE user = ?
+            """,
+            (token, client_id, updated_at, username),
+        )
+        connection.commit()
+
+
+def clear_active_session(username: str, token: str | None = None, client_id: str | None = None) -> None:
+    with get_connection() as connection:
+        if token and client_id:
+            connection.execute(
+                """
+                UPDATE USER
+                SET active_session_token = '',
+                    active_session_client_id = '',
+                    active_session_updated_at = ''
+                WHERE user = ? AND active_session_token = ? AND active_session_client_id = ?
+                """,
+                (username, token, client_id),
+            )
+        elif token:
+            connection.execute(
+                """
+                UPDATE USER
+                SET active_session_token = '',
+                    active_session_client_id = '',
+                    active_session_updated_at = ''
+                WHERE user = ? AND active_session_token = ?
+                """,
+                (username, token),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE USER
+                SET active_session_token = '',
+                    active_session_client_id = '',
+                    active_session_updated_at = ''
+                WHERE user = ?
+                """,
+                (username,),
+            )
         connection.commit()
 
 

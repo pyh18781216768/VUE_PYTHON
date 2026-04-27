@@ -26,7 +26,15 @@ DEFAULT_SETTINGS = {
 
 TASK_STATUSES = ("未开始", "进行中", "待审核", "已完成", "已驳回")
 TASK_PRIORITIES = ("低", "中", "高")
-OPERATION_ACTIONS = ("增加", "修改", "删除", "查看")
+OPERATION_ACTIONS = ("新增", "修改", "刪除", "查看")
+OPERATION_ACTION_ALIASES = {
+    "增加": "新增",
+    "新增": "新增",
+    "修改": "修改",
+    "删除": "刪除",
+    "刪除": "刪除",
+    "查看": "查看",
+}
 UPLOAD_ROOT = BASE_DIR / "storage" / "uploads"
 ROLE_PERMISSION_LEVELS = {
     "user": 1,
@@ -36,10 +44,15 @@ ROLE_PERMISSION_LEVELS = {
     "admin": 5,
 }
 ROLE_ALIASES = {
+    "普通使用者": "user",
     "普通用户": "user",
+    "線組長": "line_leader",
     "线组长": "line_leader",
+    "科長": "section_chief",
     "科长": "section_chief",
+    "部長": "department_head",
     "部长": "department_head",
+    "超級管理員": "admin",
     "超级管理员": "admin",
 }
 
@@ -89,7 +102,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     now = _now_text()
     username = _normalize_text(payload.get("username"))
     if not username:
-        raise ValueError("工号不能为空")
+        raise ValueError("工號不能為空")
 
     existing = user_repository.fetch_user(username)
     is_update = bool(existing)
@@ -116,7 +129,7 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     else:
         password = str(payload.get("password") or "").strip()
         if not password:
-            raise ValueError("新建用户时必须设置密码")
+            raise ValueError("新增使用者時必須設定密碼")
         user_repository.insert_user(
             {
                 "user": username,
@@ -137,8 +150,8 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     item = get_user_summary(username)
     _safe_record_operation(
         actor_username,
-        "用户管理",
-        "修改" if is_update else "增加",
+        "使用者管理",
+        "修改" if is_update else "新增",
         _user_operation_label(item),
         item["id"],
     )
@@ -148,23 +161,23 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
 def delete_user(username: str, actor_username: str) -> None:
     target_username = _normalize_text(username)
     if not target_username:
-        raise ValueError("工号不能为空")
+        raise ValueError("工號不能為空")
     if target_username == _normalize_text(actor_username):
-        raise ValueError("不能删除当前登录账号")
+        raise ValueError("不能刪除目前登入帳號")
 
     existing = user_repository.fetch_user(target_username)
     if not existing:
-        raise ValueError("用户不存在")
+        raise ValueError("使用者不存在")
     if _normalize_role(existing["role"]) == "admin" and not _actor_is_super_admin(actor_username):
-        raise ValueError("只有超级管理员可以删除超级管理员账号")
+        raise ValueError("只有超級管理員可以刪除超級管理員帳號")
 
     item = _build_user_summary(existing)
     user_repository.clear_supervisor_user(target_username)
     user_repository.delete_user_by_username(target_username)
     _safe_record_operation(
         actor_username,
-        "用户管理",
-        "删除",
+        "使用者管理",
+        "刪除",
         _user_operation_label(item),
         item["id"],
     )
@@ -176,19 +189,19 @@ def assign_user_permission(
     actor_username: str,
 ) -> dict[str, Any]:
     if not _actor_is_super_admin(actor_username):
-        raise ValueError("只有超级管理员可以赋予用户权限")
+        raise ValueError("只有超級管理員可以賦予使用者權限")
 
     username = _normalize_text(target_username)
     if not username:
-        raise ValueError("工号不能为空")
+        raise ValueError("工號不能為空")
 
     existing = user_repository.fetch_user(username)
     if not existing:
-        raise ValueError("用户不存在")
+        raise ValueError("使用者不存在")
 
     normalized_role = _normalize_role(role)
     if username == _normalize_text(actor_username) and normalized_role != "admin":
-        raise ValueError("不能降低当前超级管理员自己的权限")
+        raise ValueError("不能降低目前超級管理員自己的權限")
 
     user_repository.update_user_by_username(
         username,
@@ -200,9 +213,9 @@ def assign_user_permission(
     item = get_user_summary(username)
     _safe_record_operation(
         actor_username,
-        "用户管理",
+        "使用者管理",
         "修改",
-        f"权限赋予 / {_user_operation_label(item)} / {item['role']}",
+        f"權限賦予 / {_user_operation_label(item)} / {item['role']}",
         item["id"],
     )
     return item
@@ -231,9 +244,9 @@ def save_shift_group(payload: dict[str, Any], actor_username: str | None = None)
         "updated_at": now,
     }
     if not shift_payload["name"]:
-        raise ValueError("班次名称不能为空")
+        raise ValueError("班次名稱不能為空")
     if not shift_payload["start_time"] or not shift_payload["end_time"]:
-        raise ValueError("班次时间不能为空")
+        raise ValueError("班次時間不能為空")
 
     shift_group_id = _safe_int(payload.get("id"))
     is_update = bool(shift_group_id)
@@ -248,8 +261,8 @@ def save_shift_group(payload: dict[str, Any], actor_username: str | None = None)
     )
     _safe_record_operation(
         actor_username,
-        "系统设置-班次",
-        "修改" if is_update else "增加",
+        "系統設定-班次",
+        "修改" if is_update else "新增",
         _setting_operation_label(item, "班次"),
         item["id"],
     )
@@ -263,8 +276,8 @@ def delete_shift_group(shift_group_id: int, actor_username: str | None = None) -
     task_repository.delete_shift_group(shift_group_id)
     _safe_record_operation(
         actor_username,
-        "系统设置-班次",
-        "删除",
+        "系統設定-班次",
+        "刪除",
         f"#{shift_group_id} / 班次 / {_normalize_text(existing['name'])}",
         shift_group_id,
     )
@@ -279,17 +292,17 @@ def save_floor(payload: dict[str, Any], actor_username: str | None = None) -> di
         "updated_at": now,
     }
     if not floor_payload["name"]:
-        raise ValueError("楼层名称不能为空")
+        raise ValueError("樓層名稱不能為空")
     if task_repository.fetch_floor_by_name(floor_payload["name"]):
-        raise ValueError("楼层名称已存在")
+        raise ValueError("樓層名稱已存在")
 
     floor_id = task_repository.insert_floor(floor_payload)
     item = next(item for item in list_floors() if item["id"] == floor_id)
     _safe_record_operation(
         actor_username,
-        "系统设置-楼层",
-        "增加",
-        _setting_operation_label(item, "楼层"),
+        "系統設定-樓層",
+        "新增",
+        _setting_operation_label(item, "樓層"),
         item["id"],
     )
     return item
@@ -298,13 +311,13 @@ def save_floor(payload: dict[str, Any], actor_username: str | None = None) -> di
 def delete_floor(floor_id: int, actor_username: str | None = None) -> None:
     existing = task_repository.fetch_floor(floor_id)
     if not existing:
-        raise ValueError("楼层不存在")
+        raise ValueError("樓層不存在")
     task_repository.delete_floor(floor_id)
     _safe_record_operation(
         actor_username,
-        "系统设置-楼层",
-        "删除",
-        f"#{floor_id} / 楼层 / {_normalize_text(existing['name'])}",
+        "系統設定-樓層",
+        "刪除",
+        f"#{floor_id} / 樓層 / {_normalize_text(existing['name'])}",
         floor_id,
     )
 
@@ -318,17 +331,17 @@ def save_department(payload: dict[str, Any], actor_username: str | None = None) 
         "updated_at": now,
     }
     if not department_payload["name"]:
-        raise ValueError("部门名称不能为空")
+        raise ValueError("部門名稱不能為空")
     if task_repository.fetch_department_by_name(department_payload["name"]):
-        raise ValueError("部门名称已存在")
+        raise ValueError("部門名稱已存在")
 
     department_id = task_repository.insert_department(department_payload)
     item = next(item for item in list_departments() if item["id"] == department_id)
     _safe_record_operation(
         actor_username,
-        "系统设置-部门",
-        "增加",
-        _setting_operation_label(item, "部门"),
+        "系統設定-部門",
+        "新增",
+        _setting_operation_label(item, "部門"),
         item["id"],
     )
     return item
@@ -337,13 +350,13 @@ def save_department(payload: dict[str, Any], actor_username: str | None = None) 
 def delete_department(department_id: int, actor_username: str | None = None) -> None:
     existing = task_repository.fetch_department(department_id)
     if not existing:
-        raise ValueError("部门不存在")
+        raise ValueError("部門不存在")
     task_repository.delete_department(department_id)
     _safe_record_operation(
         actor_username,
-        "系统设置-部门",
-        "删除",
-        f"#{department_id} / 部门 / {_normalize_text(existing['name'])}",
+        "系統設定-部門",
+        "刪除",
+        f"#{department_id} / 部門 / {_normalize_text(existing['name'])}",
         department_id,
     )
 
@@ -365,6 +378,7 @@ def list_operation_logs(filters: dict[str, Any]) -> list[dict[str, Any]]:
     date_from = _normalize_text(filters.get("dateFrom"))
     date_to = _normalize_text(filters.get("dateTo"))
     action_type = _normalize_text(filters.get("actionType"))
+    normalized_action_filter = _normalize_operation_action(action_type)
     rows = []
     for row in task_repository.fetch_all_operation_logs():
         item = _build_operation_log_summary(row)
@@ -376,7 +390,7 @@ def list_operation_logs(filters: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         if date_to and item["operatedAt"][:10] > date_to:
             continue
-        if action_type and item["actionType"] != action_type:
+        if normalized_action_filter and item["actionType"] != normalized_action_filter:
             continue
         rows.append(item)
     return rows
@@ -389,22 +403,22 @@ def record_operation(
     record_label: str,
     record_id: Any = "",
 ) -> dict[str, Any]:
-    normalized_action = _normalize_text(action_type)
+    normalized_action = _normalize_operation_action(action_type)
     if normalized_action not in OPERATION_ACTIONS:
-        raise ValueError("操作功能类型无效")
+        raise ValueError("操作功能類型無效")
     normalized_page_name = _normalize_text(page_name)
     if not normalized_page_name:
-        raise ValueError("操作页面不能为空")
+        raise ValueError("操作頁面不能為空")
     normalized_record_label = _normalize_text(record_label)
     if not normalized_record_label:
-        raise ValueError("操作记录不能为空")
+        raise ValueError("操作記錄不能為空")
 
     try:
         operator_profile = get_user_summary(operator_username)
     except KeyError:
         operator_profile = {
             "username": _normalize_text(operator_username),
-            "displayLabel": _normalize_text(operator_username) or "未知用户",
+            "displayLabel": _normalize_text(operator_username) or "未知使用者",
         }
 
     payload = {
@@ -475,7 +489,7 @@ def save_handover_record(
 ) -> dict[str, Any]:
     now = _now_text()
     record_payload = {
-        "title": _normalize_text(payload.get("title")) or "交接班记录",
+        "title": _normalize_text(payload.get("title")) or "交接班記錄",
         "shift_group_id": _safe_int(payload.get("shiftGroupId")),
         "floor_id": _safe_int(payload.get("floorId")),
         "handover_user": _resolve_person_username(payload.get("handoverUser")) or _normalize_text(actor_username),
@@ -488,15 +502,15 @@ def save_handover_record(
         "updated_at": now,
     }
     if not record_payload["receiver_user"]:
-        raise ValueError("接班人不能为空")
+        raise ValueError("接班人不能為空")
     if not record_payload["floor_id"]:
-        raise ValueError("楼层不能为空")
+        raise ValueError("樓層不能為空")
 
     record_id = _safe_int(payload.get("id"))
     is_update = bool(record_id)
     if record_id:
         if not task_repository.fetch_handover_record(record_id):
-            raise ValueError("交接班记录不存在")
+            raise ValueError("交接班記錄不存在")
         task_repository.update_handover_record(
             record_id,
             {
@@ -517,8 +531,8 @@ def save_handover_record(
     item = next(item for item in list_handover_records({}) if item["id"] == record_id)
     _safe_record_operation(
         actor_username,
-        "交接班记录",
-        "修改" if is_update else "增加",
+        "交接班記錄",
+        "修改" if is_update else "新增",
         _handover_operation_label(item),
         item["id"],
     )
@@ -528,14 +542,14 @@ def save_handover_record(
 def delete_handover_record(record_id: int, actor_username: str | None = None) -> None:
     existing = task_repository.fetch_handover_record(record_id)
     if not existing:
-        raise ValueError("交接班记录不存在")
+        raise ValueError("交接班記錄不存在")
     attachments = task_repository.fetch_attachments_for_owner("handover", record_id)
     task_repository.delete_handover_record(record_id)
     _delete_attachment_files(attachments)
     _safe_record_operation(
         actor_username,
-        "交接班记录",
-        "删除",
+        "交接班記錄",
+        "刪除",
         f"#{record_id} / {_normalize_text(existing['keywords']) or _normalize_text(existing['title']) or _normalize_text(existing['receiver_user'])}",
         record_id,
     )
@@ -603,15 +617,15 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
     now = _now_text()
     status = _normalize_text(payload.get("status")) or "未开始"
     if status not in TASK_STATUSES:
-        raise ValueError("任务状态无效")
+        raise ValueError("任務狀態無效")
     priority = _normalize_text(payload.get("priority")) or "中"
     if priority not in TASK_PRIORITIES:
-        raise ValueError("任务优先级无效")
+        raise ValueError("任務優先級無效")
 
     start_at = _normalize_datetime_text(payload.get("startAt"))
     due_at = _normalize_datetime_text(payload.get("dueAt"))
     if start_at and due_at and _parse_datetime(due_at) < _parse_datetime(start_at):
-        raise ValueError("到期时间不能早于开始时间")
+        raise ValueError("到期時間不能早於開始時間")
     task_payload = {
         "title": _normalize_text(payload.get("title")),
         "description": _normalize_text(payload.get("description")),
@@ -630,7 +644,7 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         "rejected_at": _normalize_datetime_text(payload.get("rejectedAt")) if status == "已驳回" else "",
     }
     if not task_payload["title"]:
-        raise ValueError("任务标题不能为空")
+        raise ValueError("任務標題不能為空")
 
     task_id = _safe_int(payload.get("id"))
     is_update = bool(task_id)
@@ -639,13 +653,13 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         if not existing:
             raise KeyError(task_id)
         if not _can_actor_edit_task(existing, actor_username):
-            raise ValueError("你没有权限编辑该任务")
+            raise ValueError("你沒有權限編輯該任務")
         if status == "已驳回" and not task_payload["reject_reason"]:
             task_payload["reject_reason"] = _normalize_text(existing["reject_reason"])
             task_payload["rejected_by"] = _normalize_text(existing["rejected_by"])
             task_payload["rejected_at"] = _normalize_text(existing["rejected_at"])
         if status == "已驳回" and not task_payload["reject_reason"]:
-            raise ValueError("驳回理由不能为空，请使用驳回按钮填写理由")
+            raise ValueError("駁回理由不能為空，請使用駁回按鈕填寫理由")
         if status == "已完成" and not existing["completed_at"]:
             task_payload["completed_at"] = now
         elif status != "已完成":
@@ -657,7 +671,7 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         task_repository.update_task(task_id, task_payload)
     else:
         if status == "已驳回" and not task_payload["reject_reason"]:
-            raise ValueError("驳回理由不能为空，请使用驳回按钮填写理由")
+            raise ValueError("駁回理由不能為空，請使用駁回按鈕填寫理由")
         task_id = task_repository.insert_task(
             {
                 **task_payload,
@@ -670,8 +684,8 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
     item = next(item for item in list_tasks({}) if item["id"] == task_id)
     _safe_record_operation(
         actor_username,
-        "任务清单",
-        "修改" if is_update else "增加",
+        "任務清單",
+        "修改" if is_update else "新增",
         _task_operation_label(item),
         item["id"],
     )
@@ -681,16 +695,16 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
 def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
     existing = task_repository.fetch_task(task_id)
     if not existing:
-        raise ValueError("任务不存在")
+        raise ValueError("任務不存在")
     status = _normalize_text(existing["status"])
     if status == "已完成":
-        raise ValueError("已完成任务不能领取")
+        raise ValueError("已完成任務不能領取")
     if status == "已驳回":
-        raise ValueError("已驳回任务不能领取")
+        raise ValueError("已駁回任務不能領取")
     if status == "待审核":
-        raise ValueError("待审核任务不能领取")
+        raise ValueError("待審核任務不能領取")
     if not _is_actor_task_assignee(existing, actor_username):
-        raise ValueError("只有任务负责人可以领取该任务")
+        raise ValueError("只有任務負責人可以領取該任務")
 
     now = _now_text()
     task_repository.update_task(
@@ -708,9 +722,9 @@ def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
     item = next(item for item in list_tasks({}) if item["id"] == task_id)
     _safe_record_operation(
         actor_username,
-        "任务清单",
+        "任務清單",
         "修改",
-        f"领取 / {_task_operation_label(item)}",
+        f"領取 / {_task_operation_label(item)}",
         item["id"],
     )
     return item
@@ -719,18 +733,18 @@ def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
 def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any]:
     existing = task_repository.fetch_task(task_id)
     if not existing:
-        raise ValueError("任务不存在")
+        raise ValueError("任務不存在")
     reject_reason = _normalize_text(reason)
     if not reject_reason:
-        raise ValueError("驳回理由不能为空")
+        raise ValueError("駁回理由不能為空")
     if _normalize_text(existing["status"]) == "已完成":
-        raise ValueError("已完成任务不能驳回")
+        raise ValueError("已完成任務不能駁回")
     if _normalize_text(existing["status"]) == "已驳回":
-        raise ValueError("已驳回任务不能重复驳回")
+        raise ValueError("已駁回任務不能重複駁回")
     if _normalize_text(existing["status"]) == "待审核":
-        raise ValueError("待审核任务请通过评分审核")
+        raise ValueError("待審核任務請透過評分審核")
     if not (_is_actor_task_assignee(existing, actor_username) or _actor_has_level5(actor_username)):
-        raise ValueError("只有任务负责人或 5 级权限者可以驳回该任务")
+        raise ValueError("只有任務負責人或 5 級權限者可以駁回該任務")
 
     now = _now_text()
     task_repository.update_task(
@@ -747,9 +761,9 @@ def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any
     item = next(item for item in list_tasks({}) if item["id"] == task_id)
     _safe_record_operation(
         actor_username,
-        "任务清单",
+        "任務清單",
         "修改",
-        f"驳回 / {_task_operation_label(item)}",
+        f"駁回 / {_task_operation_label(item)}",
         item["id"],
     )
     return item
@@ -763,15 +777,15 @@ def submit_task_for_review(
 ) -> dict[str, Any]:
     existing = task_repository.fetch_task(task_id)
     if not existing:
-        raise ValueError("任务不存在")
+        raise ValueError("任務不存在")
     if _normalize_text(existing["status"]) != "进行中":
-        raise ValueError("只有进行中的任务可以提交审核")
+        raise ValueError("只有進行中的任務可以提交審核")
     if not _is_actor_task_assignee(existing, actor_username):
-        raise ValueError("只有任务负责人可以提交审核")
+        raise ValueError("只有任務負責人可以提交審核")
 
     content = _normalize_text(payload.get("content"))
     if not content:
-        raise ValueError("提交内容不能为空")
+        raise ValueError("提交內容不能為空")
 
     now = _now_text()
     submission_id = task_repository.insert_task_submission(
@@ -802,9 +816,9 @@ def submit_task_for_review(
     item = next(item for item in list_tasks({}) if item["id"] == task_id)
     _safe_record_operation(
         actor_username,
-        "任务清单",
+        "任務清單",
         "修改",
-        f"提交审核 / {_task_operation_label(item)}",
+        f"提交審核 / {_task_operation_label(item)}",
         item["id"],
     )
     return item
@@ -813,19 +827,19 @@ def submit_task_for_review(
 def review_task_submission(task_id: int, payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     existing = task_repository.fetch_task(task_id)
     if not existing:
-        raise ValueError("任务不存在")
+        raise ValueError("任務不存在")
     if _normalize_text(existing["status"]) != "待审核":
-        raise ValueError("只有待审核任务可以评分")
+        raise ValueError("只有待審核任務可以評分")
 
     submission = task_repository.fetch_latest_task_submission(task_id)
     if not submission or _normalize_text(submission["status"]) != "pending":
-        raise ValueError("当前任务没有待审核提交")
+        raise ValueError("目前任務沒有待審核提交")
 
     reviewer_username = _normalize_text(actor_username)
     reviewers = _build_task_reviewers_from_row(existing)
     reviewer_usernames = {item["username"] for item in reviewers if item.get("username")}
     if reviewer_username not in reviewer_usernames:
-        raise ValueError("只有任务发布人和 @ 人员可以评分")
+        raise ValueError("只有任務發布人和 @ 人員可以評分")
 
     score = _normalize_score(payload.get("score"))
     comment = _normalize_text(payload.get("comment"))
@@ -884,9 +898,9 @@ def review_task_submission(task_id: int, payload: dict[str, Any], actor_username
     item = next(item for item in list_tasks({}) if item["id"] == task_id)
     _safe_record_operation(
         actor_username,
-        "任务清单",
+        "任務清單",
         "修改",
-        f"审核评分 {score:g} / {_task_operation_label(item)}",
+        f"審核評分 {score:g} / {_task_operation_label(item)}",
         item["id"],
     )
     return item
@@ -895,9 +909,9 @@ def review_task_submission(task_id: int, payload: dict[str, Any], actor_username
 def delete_task(task_id: int, actor_username: str | None = None) -> None:
     existing = task_repository.fetch_task(task_id)
     if not existing:
-        raise ValueError("任务不存在")
+        raise ValueError("任務不存在")
     if actor_username and not _can_actor_edit_task(existing, actor_username):
-        raise ValueError("你没有权限删除该任务")
+        raise ValueError("你沒有權限刪除該任務")
     attachments = list(task_repository.fetch_attachments_for_owner("task", task_id))
     for submission in task_repository.fetch_all_task_submissions():
         if int(submission["task_id"]) != int(task_id):
@@ -909,8 +923,8 @@ def delete_task(task_id: int, actor_username: str | None = None) -> None:
     _delete_attachment_files(attachments)
     _safe_record_operation(
         actor_username,
-        "任务清单",
-        "删除",
+        "任務清單",
+        "刪除",
         f"#{task_id} / {_normalize_text(existing['title'])}",
         task_id,
     )
@@ -980,7 +994,7 @@ def get_reminders(
                     "reminderKind": "due",
                     "reminderTitle": f"{task['title']} 到期提醒",
                     "reminderTime": task["dueAt"],
-                    "timeLabel": "到期时间",
+                    "timeLabel": "到期時間",
                     "minutesUntil": minutes_until,
                     "remainingText": _format_remaining_text(minutes_until),
                 }
@@ -1001,7 +1015,7 @@ def get_reminders(
                 "reminderKind": "start",
                 "reminderTitle": task["title"],
                 "reminderTime": task["startAt"],
-                "timeLabel": "开始时间",
+                "timeLabel": "開始時間",
                 "minutesUntil": minutes_until,
                 "remainingText": _format_remaining_text(minutes_until),
             }
@@ -1077,14 +1091,14 @@ def get_reminders(
                         "reminderId": f"task-review-pending:{submission_id}",
                         "reminderType": "task",
                         "reminderKind": "review-pending",
-                        "reminderTitle": "任务状态为待审核",
+                        "reminderTitle": "任務狀態為待審核",
                         "title": task["title"],
                         "taskId": task["id"],
                         "assigneeUser": task["assigneeUser"],
                         "reviewStatusLabel": submission.get("statusLabel"),
                         "reviewerLabels": submission.get("reviewerLabels"),
                         "reminderTime": submission.get("submittedAt"),
-                        "description": f"任务 #{task['id']} 已提交审核，等待 {submission.get('reviewerLabels') or '审核人'} 评分。",
+                        "description": f"任務 #{task['id']} 已提交審核，等待 {submission.get('reviewerLabels') or '審核人'} 評分。",
                     }
                 )
             if reviewer and not reviewer.get("hasReviewed"):
@@ -1093,14 +1107,14 @@ def get_reminders(
                         "reminderId": f"task-review-needed:{submission_id}:{reviewer.get('username')}",
                         "reminderType": "task",
                         "reminderKind": "review-needed",
-                        "reminderTitle": "任务待审核评分",
+                        "reminderTitle": "任務待審核評分",
                         "title": task["title"],
                         "taskId": task["id"],
                         "assigneeUser": task["assigneeUser"],
                         "reviewStatusLabel": submission.get("statusLabel"),
                         "reviewerLabels": submission.get("reviewerLabels"),
                         "reminderTime": submission.get("submittedAt"),
-                        "description": f"任务 #{task['id']} 由 {task['assigneeUser'] or '负责人'} 提交审核，请评分。",
+                        "description": f"任務 #{task['id']} 由 {task['assigneeUser'] or '負責人'} 提交審核，請評分。",
                     }
                 )
             continue
@@ -1112,7 +1126,7 @@ def get_reminders(
                     "reminderId": f"task-review-result:{submission_id}:{submission_status}",
                     "reminderType": "task",
                     "reminderKind": "review-result",
-                    "reminderTitle": "任务审核通过" if passed else "任务审核未通过",
+                    "reminderTitle": "任務審核通過" if passed else "任務審核未通過",
                     "title": task["title"],
                     "taskId": task["id"],
                     "assigneeUser": task["assigneeUser"],
@@ -1121,9 +1135,9 @@ def get_reminders(
                     "grade": submission.get("grade"),
                     "reminderTime": submission.get("reviewedAt") or submission.get("updatedAt") or submission.get("submittedAt"),
                     "description": (
-                        f"平均分 {submission.get('averageScore')}，等级 {submission.get('grade') or '--'}。"
+                        f"平均分 {submission.get('averageScore')}，等級 {submission.get('grade') or '--'}。"
                         if passed
-                        else f"平均分 {submission.get('averageScore')}，任务已退回进行中。"
+                        else f"平均分 {submission.get('averageScore')}，任務已退回進行中。"
                     ),
                 }
             )
@@ -1282,7 +1296,7 @@ def _build_operation_log_summary(row) -> dict[str, Any]:
         "operatorLabel": operator_user["label"] or _normalize_text(row["operator_label"]),
         "operatedAt": _normalize_text(row["operated_at"]),
         "pageName": _normalize_text(row["page_name"]),
-        "actionType": _normalize_text(row["action_type"]),
+        "actionType": _normalize_operation_action(row["action_type"]) or _normalize_text(row["action_type"]),
         "recordLabel": _normalize_text(row["record_label"]),
         "recordId": _normalize_text(row["record_id"]),
     }
@@ -1572,15 +1586,15 @@ def _build_task_reviewers_from_row(task_row) -> list[dict[str, str]]:
 def _get_submission_status_label(status: str) -> str:
     normalized_status = _normalize_text(status)
     if normalized_status == "passed":
-        return "审核通过"
+        return "審核通過"
     if normalized_status == "failed":
-        return "审核未通过"
-    return "待审核"
+        return "審核未通過"
+    return "待審核"
 
 
 def _get_review_grade(average_score: float) -> str:
     if average_score > 80:
-        return "优秀"
+        return "優秀"
     if average_score >= 60:
         return "良"
     return "不合格"
@@ -1590,9 +1604,9 @@ def _normalize_score(value) -> float:
     try:
         score = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError("评分必须是 0-100 的数字") from exc
+        raise ValueError("評分必須是 0-100 的數字") from exc
     if score < 0 or score > 100:
-        raise ValueError("评分必须在 0-100 之间")
+        raise ValueError("評分必須在 0-100 之間")
     return score
 
 
@@ -1779,6 +1793,11 @@ def _normalize_role(value) -> str:
     role = _normalize_text(value).lower()
     role = ROLE_ALIASES.get(role, role)
     return role if role in ROLE_PERMISSION_LEVELS else "user"
+
+
+def _normalize_operation_action(value) -> str:
+    action = _normalize_text(value)
+    return OPERATION_ACTION_ALIASES.get(action, action)
 
 
 def _resolve_person_name(value) -> str:

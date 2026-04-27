@@ -10,6 +10,7 @@
   const NOTIFICATION_READ_STORAGE_PREFIX = "fab_notification_reads_";
   const NOTIFICATION_CLEARED_STORAGE_PREFIX = "fab_notification_cleared_";
   const LANGUAGE_STORAGE_KEY = "fab_ui_language";
+  const CLIENT_INSTANCE_STORAGE_KEY = "fab_client_instance_id";
   const DEFAULT_LANGUAGE = "zh-Hant";
   const LANGUAGE_MODES = [
     { key: "zh-Hant", label: "繁體", shortLabel: "繁" },
@@ -18,6 +19,7 @@
   const TRANSLATABLE_ATTRIBUTES = ["placeholder", "title", "aria-label"];
   const translationTextCache = new WeakMap();
   const translationAttributeCache = new WeakMap();
+  const CLIENT_INSTANCE_ID = initializeClientInstanceId();
   const SIMPLIFIED_TO_TRADITIONAL_MAP = {
     "万": "萬", "与": "與", "专": "專", "业": "業", "东": "東", "丝": "絲", "两": "兩", "严": "嚴", "个": "個",
     "临": "臨", "为": "為", "丽": "麗", "举": "舉", "么": "麼", "义": "義", "乌": "烏", "乐": "樂", "乔": "喬",
@@ -267,8 +269,30 @@
       .join("");
   }
 
+  const TRADITIONAL_TO_SIMPLIFIED_MAP = Object.entries(SIMPLIFIED_TO_TRADITIONAL_MAP).reduce(
+    (acc, [simplified, traditional]) => {
+      if (!acc[traditional]) acc[traditional] = simplified;
+      return acc;
+    },
+    {}
+  );
+  Object.assign(TRADITIONAL_TO_SIMPLIFIED_MAP, {
+    "著": "着",
+    "裡": "里",
+    "臺": "台",
+    "於": "于",
+  });
+
+  function convertToSimplified(text) {
+    return String(text || "")
+      .split("")
+      .map((char) => TRADITIONAL_TO_SIMPLIFIED_MAP[char] || char)
+      .join("");
+  }
+
   function translateUiText(text, language) {
     if (language === "zh-Hant") return convertToTraditional(text);
+    if (language === "zh-Hans") return convertToSimplified(text);
     return String(text || "");
   }
 
@@ -333,6 +357,26 @@
         cachedAttributes[attr] = { source, translated };
       }
     }
+  }
+
+  function createClientInstanceId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function initializeClientInstanceId() {
+    const navigationEntry = window.performance?.getEntriesByType?.("navigation")?.[0];
+    const isReload = navigationEntry?.type === "reload";
+    const existingId = window.sessionStorage?.getItem(CLIENT_INSTANCE_STORAGE_KEY);
+    if (isReload && existingId) return existingId;
+
+    const clientId = createClientInstanceId();
+    window.sessionStorage?.setItem(CLIENT_INSTANCE_STORAGE_KEY, clientId);
+    return clientId;
+  }
+
+  function getClientInstanceHeaders() {
+    return { "X-Client-Instance": CLIENT_INSTANCE_ID };
   }
 
   const ROUTES = {
@@ -571,7 +615,7 @@
     handovers: [],
     tasks: [],
     operationLogs: [],
-    operationActions: ["增加", "修改", "删除", "查看"],
+    operationActions: ["新增", "修改", "刪除", "查看"],
     reports: {
       handoverCount: 0,
       taskCount: 0,
@@ -817,7 +861,7 @@
     props: {
       modelValue: { type: [String, Number], default: "" },
       options: { type: Array, default: () => [] },
-      placeholder: { type: String, default: "搜索或选择" },
+      placeholder: { type: String, default: "搜尋或選擇" },
       emptyLabel: { type: String, default: "" },
       allowEmpty: { type: Boolean, default: true },
       disabled: { type: Boolean, default: false },
@@ -973,7 +1017,7 @@
     props: {
       modelValue: { type: Array, default: () => [] },
       options: { type: Array, default: () => [] },
-      placeholder: { type: String, default: "搜索或选择" },
+      placeholder: { type: String, default: "搜尋或選擇" },
       disabled: { type: Boolean, default: false },
     },
     emits: ["update:modelValue"],
@@ -1460,7 +1504,7 @@
         (taskSystem.value.priorityOptions || []).map((item) => ({ value: item, label: item }))
       );
       const operationActionSelectOptions = computed(() =>
-        (taskSystem.value.operationActions || ["增加", "修改", "删除", "查看"]).map((item) => ({
+        (taskSystem.value.operationActions || ["新增", "修改", "刪除", "查看"]).map((item) => ({
           value: item,
           label: item,
         }))
@@ -1472,7 +1516,7 @@
         }))
       );
       const roleSelectOptions = [
-        { value: "user", label: "普通用户" },
+        { value: "user", label: "普通使用者" },
         { value: "line_leader", label: "线组长" },
         { value: "section_chief", label: "科长" },
         { value: "department_head", label: "部长" },
@@ -1643,7 +1687,7 @@
             description: [
               item.handoverUser && item.receiverUser ? `${item.handoverUser} → ${item.receiverUser}` : "",
               item.keywords || "",
-              `剩余 ${formatReminderRemaining(item)}`,
+              `剩餘 ${formatReminderRemaining(item)}`,
             ].filter(Boolean).join(" / "),
             time: item.startTime,
             handoverRecordId: item.handoverRecordId,
@@ -1652,18 +1696,18 @@
         });
         const taskItems = (taskSystem.value.reminders?.dueTasks || []).map((item) => {
           const reminderTime = item.reminderTime || item.startAt || item.dueAt;
-          const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期时间" : "开始时间");
+          const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期時間" : "開始時間");
           const remainingText = formatReminderRemaining(item);
           const id = item.reminderId || `task:${item.id}:${reminderTime}`;
           return {
             id,
             type: "task",
-            typeLabel: item.reminderKind === "due" ? "任务到期提醒" : "任务提醒",
+            typeLabel: item.reminderKind === "due" ? "任務到期提醒" : "任務提醒",
             title: item.reminderTitle || item.title,
             description: [
-              item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+              item.assigneeUser ? `負責人：${item.assigneeUser}` : "",
               `${timeLabel}：${formatDateTime(reminderTime)}`,
-              remainingText === "已到期" ? "已到期" : `剩余 ${remainingText}`,
+              remainingText === "已到期" ? "已到期" : `剩餘 ${remainingText}`,
             ].filter(Boolean).join(" / "),
             time: reminderTime,
             taskId: item.id,
@@ -1676,12 +1720,12 @@
           return {
             id,
             type: "task",
-            typeLabel: item.reminderKind === "review-needed" ? "任务待评分" : "任务审核通知",
+            typeLabel: item.reminderKind === "review-needed" ? "任務待評分" : "任務審核通知",
             title: item.reminderTitle || item.title,
             description: item.description || [
-              item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
-              item.reviewStatusLabel ? `状态：${item.reviewStatusLabel}` : "",
-              item.grade ? `等级：${item.grade}` : "",
+              item.assigneeUser ? `負責人：${item.assigneeUser}` : "",
+              item.reviewStatusLabel ? `狀態：${item.reviewStatusLabel}` : "",
+              item.grade ? `等級：${item.grade}` : "",
             ].filter(Boolean).join(" / "),
             time: reminderTime,
             taskId: item.taskId,
@@ -1703,11 +1747,11 @@
       );
       const detailDialogTitle = computed(() => {
         const record = detailDialogRecord.value;
-        if (!record) return "详情";
-        if (detailDialogType.value === "handover") return `交接班详情 #${record.id}`;
-        if (detailDialogType.value === "task") return `任务详情 #${record.id}`;
-        if (detailDialogType.value === "user") return `账号详情 #${record.id || record.username}`;
-        return "详情";
+        if (!record) return "詳情";
+        if (detailDialogType.value === "handover") return `交接班詳情 #${record.id}`;
+        if (detailDialogType.value === "task") return `任務詳情 #${record.id}`;
+        if (detailDialogType.value === "user") return `帳號詳情 #${record.id || record.username}`;
+        return "詳情";
       });
       const detailDialogSubtitle = computed(() => {
         const record = detailDialogRecord.value;
@@ -2283,13 +2327,15 @@
           credentials: "same-origin",
           headers: {
             "Content-Type": "application/json",
+            ...getClientInstanceHeaders(),
             ...(options?.headers || {}),
           },
           ...options,
         });
 
         const payload = await response.json().catch(() => ({}));
-        if (response.status === 401) {
+        if (response.status === 401 && url !== "/api/login") {
+          authMessage.value = payload.message || "登入狀態已失效，請重新登入。";
           isAuthenticated.value = false;
           authUser.value = {
             username: "",
@@ -2309,7 +2355,7 @@
         }
 
         if (!response.ok) {
-          throw new Error(payload.message || "Request failed.");
+          throw new Error(payload.message || "請求失敗。");
         }
 
         return payload;
@@ -2323,17 +2369,22 @@
         const response = await fetch(url, {
           method: options.method || "POST",
           credentials: "same-origin",
+          headers: {
+            ...getClientInstanceHeaders(),
+            ...(options.headers || {}),
+          },
           body: formData,
         });
 
         const responsePayload = await response.json().catch(() => ({}));
         if (response.status === 401) {
+          authMessage.value = responsePayload.message || "登入狀態已失效，請重新登入。";
           isAuthenticated.value = false;
           syncRouteWithState(true);
           throw new Error(AUTH_REQUIRED_ERROR);
         }
         if (!response.ok) {
-          throw new Error(responsePayload.message || "Request failed.");
+          throw new Error(responsePayload.message || "請求失敗。");
         }
         return responsePayload;
       }
@@ -2504,7 +2555,7 @@
 
       function getRoleLabel(role) {
         const option = roleSelectOptions.find((item) => item.value === role);
-        return option?.label || "普通用户";
+        return option?.label || "普通使用者";
       }
 
       function getTaskStatusBoxClass(status) {
@@ -2803,7 +2854,10 @@
             resetProfileForm();
           }
         } catch (errorInstance) {
-          authMessage.value = errorInstance instanceof Error ? errorInstance.message : String(errorInstance);
+          const message = errorInstance instanceof Error ? errorInstance.message : String(errorInstance);
+          if (message !== AUTH_REQUIRED_ERROR) {
+            authMessage.value = message;
+          }
         } finally {
           authChecking.value = false;
         }
@@ -2881,7 +2935,7 @@
           });
           authUser.value = payload.user;
           resetProfileForm();
-          setProfileMessage(payload.message || "个人信息已保存。", "success");
+          setProfileMessage(payload.message || "個人資訊已儲存。", "success");
         } catch (errorInstance) {
           setProfileMessage(
             errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
@@ -3046,7 +3100,7 @@
         const totalHours = minutesUntil ? Math.ceil(minutesUntil / 60) : 0;
         const days = Math.floor(totalHours / 24);
         const hours = totalHours % 24;
-        return `${days}天${String(hours).padStart(2, "0")}小时`;
+        return `${days}天${String(hours).padStart(2, "0")}小時`;
       }
 
       function isTaskFormIdle() {
@@ -3055,15 +3109,15 @@
 
       function validateHandoverForm() {
         if (!handoverForm.shiftGroupId) {
-          setTaskActionMessage("请选择班次。", "error");
+          setTaskActionMessage("請選擇班次。", "error");
           return false;
         }
         if (!handoverForm.floorId) {
-          setTaskActionMessage("请选择楼层。", "error");
+          setTaskActionMessage("請選擇樓層。", "error");
           return false;
         }
         if (!handoverForm.receiverUser) {
-          setTaskActionMessage("请选择接班人。", "error");
+          setTaskActionMessage("請選擇接班人。", "error");
           return false;
         }
         return true;
@@ -3071,14 +3125,14 @@
 
       function validateTaskForm() {
         if (!taskForm.title.trim()) {
-          setTaskActionMessage("请输入任务标题。", "error");
+          setTaskActionMessage("請輸入任務標題。", "error");
           return false;
         }
         if (taskForm.startAt && taskForm.dueAt) {
           const startTime = new Date(taskForm.startAt).getTime();
           const dueTime = new Date(taskForm.dueAt).getTime();
           if (Number.isFinite(startTime) && Number.isFinite(dueTime) && dueTime < startTime) {
-            setTaskActionMessage("到期时间不能早于开始时间。", "error");
+            setTaskActionMessage("到期時間不能早於開始時間。", "error");
             return false;
           }
         }
@@ -3088,16 +3142,16 @@
       function validateUserForm() {
         const username = userForm.username.trim();
         if (!username) {
-          setTaskActionMessage("请输入工号。", "error");
+          setTaskActionMessage("請輸入工號。", "error");
           return false;
         }
         if (!userForm.displayName.trim()) {
-          setTaskActionMessage("请输入姓名。", "error");
+          setTaskActionMessage("請輸入姓名。", "error");
           return false;
         }
         const isExistingUser = taskUsers.value.some((item) => item.username === username);
         if (!isExistingUser && !userForm.password.trim()) {
-          setTaskActionMessage("新建用户时必须设置密码。", "error");
+          setTaskActionMessage("新增使用者時必須設定密碼。", "error");
           return false;
         }
         return true;
@@ -3220,7 +3274,7 @@
           });
           upsertTaskSystemItem("operationLogs", responsePayload.item);
         } catch (errorInstance) {
-          // 查看日志失败不应该打断详情弹窗。
+          // 查看記錄失敗不應該打斷詳情彈窗。
         }
       }
 
@@ -3228,7 +3282,7 @@
         if (!record) return null;
         if (type === "handover") {
           return {
-            pageName: "交接班记录",
+            pageName: "交接班記錄",
             recordId: record.id,
             recordLabel: [
               `#${record.id}`,
@@ -3240,7 +3294,7 @@
         }
         if (type === "task") {
           return {
-            pageName: "任务清单",
+            pageName: "任務清單",
             recordId: record.id,
             recordLabel: [
               `#${record.id}`,
@@ -3251,7 +3305,7 @@
         }
         if (type === "user") {
           return {
-            pageName: "用户管理",
+            pageName: "使用者管理",
             recordId: record.id || record.username,
             recordLabel: [
               `#${record.id || record.username}`,
@@ -3275,33 +3329,33 @@
       function buildHandoverDetailSections(record) {
         return [
           {
-            title: "基础信息",
+            title: "基礎資訊",
             fields: [
               { label: "ID", value: detailValue(record.id) },
-              { label: "关键词", value: detailValue(record.keywords) },
-              { label: "楼层", value: detailValue(record.floorName) },
+              { label: "關鍵詞", value: detailValue(record.keywords) },
+              { label: "樓層", value: detailValue(record.floorName) },
               { label: "交班班次", value: detailValue(record.shiftName) },
               { label: "接班班次", value: detailValue(record.receiverShiftName) },
-              { label: "创建时间", value: formatDateTime(record.createdAt || record.recordTime) },
-              { label: "更新时间", value: formatDateTime(record.updatedAt) },
-              { label: "创建人", value: detailValue(record.createdBy) },
+              { label: "建立時間", value: formatDateTime(record.createdAt || record.recordTime) },
+              { label: "更新時間", value: formatDateTime(record.updatedAt) },
+              { label: "建立人", value: detailValue(record.createdBy) },
             ],
           },
           {
-            title: "交接人员",
+            title: "交接人員",
             fields: [
               { label: "交班人", value: detailValue(record.handoverUser) },
               { label: "接班人", value: detailValue(record.receiverUser) },
               { label: "接班人主管", value: detailValue(record.receiverSupervisorLabel) },
-              { label: "@人员", value: detailValue(record.mentionUserLabels), long: true },
+              { label: "@人員", value: detailValue(record.mentionUserLabels), long: true },
             ],
           },
           {
-            title: "交接内容",
+            title: "交接內容",
             fields: [
-              { label: "当班情况", value: detailValue(record.workSummary), long: true },
-              { label: "注意事项", value: detailValue(record.precautions), long: true },
-              { label: "未完成事项", value: detailValue(record.pendingItems), long: true },
+              { label: "當班情況", value: detailValue(record.workSummary), long: true },
+              { label: "注意事項", value: detailValue(record.precautions), long: true },
+              { label: "未完成事項", value: detailValue(record.pendingItems), long: true },
             ],
           },
         ];
@@ -3310,56 +3364,56 @@
       function buildTaskDetailSections(record) {
         const sections = [
           {
-            title: "基础信息",
+            title: "基礎資訊",
             fields: [
               { label: "ID", value: detailValue(record.id) },
-              { label: "标题", value: detailValue(record.title), long: true },
-              { label: "状态", value: detailValue(record.status) },
-              { label: "优先级", value: detailValue(record.priority) },
-              { label: "负责人", value: detailValue(record.assigneeUser) },
-              { label: "发布者", value: detailValue(record.creatorUser) },
+              { label: "標題", value: detailValue(record.title), long: true },
+              { label: "狀態", value: detailValue(record.status) },
+              { label: "優先級", value: detailValue(record.priority) },
+              { label: "負責人", value: detailValue(record.assigneeUser) },
+              { label: "發布者", value: detailValue(record.creatorUser) },
               { label: "主管", value: detailValue(record.supervisorLabel) },
-              { label: "@人员", value: detailValue(record.mentionUserLabels), long: true },
+              { label: "@人員", value: detailValue(record.mentionUserLabels), long: true },
             ],
           },
           {
-            title: "时间与关联",
+            title: "時間與關聯",
             fields: [
-              { label: "创建时间", value: formatDateTime(record.createdAt) },
-              { label: "更新时间", value: formatDateTime(record.updatedAt) },
-              { label: "开始时间", value: formatDateTime(record.startAt) },
-              { label: "到期时间", value: formatDateTime(record.dueAt) },
-              { label: "完成时间", value: formatDateTime(record.completedAt) },
-              { label: "关联交接班", value: getHandoverRecordLabel(record.handoverRecordId), long: true },
+              { label: "建立時間", value: formatDateTime(record.createdAt) },
+              { label: "更新時間", value: formatDateTime(record.updatedAt) },
+              { label: "開始時間", value: formatDateTime(record.startAt) },
+              { label: "到期時間", value: formatDateTime(record.dueAt) },
+              { label: "完成時間", value: formatDateTime(record.completedAt) },
+              { label: "關聯交接班", value: getHandoverRecordLabel(record.handoverRecordId), long: true },
             ],
           },
           {
-            title: "任务内容",
+            title: "任務內容",
             fields: [
-              { label: "任务描述", value: detailValue(record.description), long: true },
-              { label: "驳回人", value: detailValue(record.rejectedBy) },
-              { label: "驳回时间", value: formatDateTime(record.rejectedAt) },
-              { label: "驳回理由", value: detailValue(record.rejectReason), long: true },
+              { label: "任務描述", value: detailValue(record.description), long: true },
+              { label: "駁回人", value: detailValue(record.rejectedBy) },
+              { label: "駁回時間", value: formatDateTime(record.rejectedAt) },
+              { label: "駁回理由", value: detailValue(record.rejectReason), long: true },
             ],
           },
         ];
         const submission = record.reviewSubmission;
         if (submission) {
           sections.push({
-            title: "提交审核",
+            title: "提交審核",
             fields: [
               { label: "提交人", value: detailValue(submission.submitterUser) },
-              { label: "提交时间", value: formatDateTime(submission.submittedAt) },
-              { label: "审核状态", value: detailValue(submission.statusLabel) },
-              { label: "审核人", value: detailValue(submission.reviewerLabels), long: true },
+              { label: "提交時間", value: formatDateTime(submission.submittedAt) },
+              { label: "審核狀態", value: detailValue(submission.statusLabel) },
+              { label: "審核人", value: detailValue(submission.reviewerLabels), long: true },
               { label: "平均分", value: detailValue(submission.averageScore) },
-              { label: "等级", value: detailValue(submission.grade) },
-              { label: "审核完成时间", value: formatDateTime(submission.reviewedAt) },
-              { label: "提交内容", value: detailValue(submission.content), long: true },
+              { label: "等級", value: detailValue(submission.grade) },
+              { label: "審核完成時間", value: formatDateTime(submission.reviewedAt) },
+              { label: "提交內容", value: detailValue(submission.content), long: true },
               {
-                label: "评分明细",
+                label: "評分明細",
                 value: detailValue((submission.reviewers || []).map((reviewer) => {
-                  const scoreText = reviewer.hasReviewed ? `${reviewer.score}分` : "未评分";
+                  const scoreText = reviewer.hasReviewed ? `${reviewer.score}分` : "未評分";
                   const commentText = reviewer.comment ? `：${reviewer.comment}` : "";
                   return `${reviewer.label || reviewer.username} ${scoreText}${commentText}`;
                 })),
@@ -3374,24 +3428,24 @@
       function buildUserDetailSections(record) {
         return [
           {
-            title: "账号信息",
+            title: "帳號資訊",
             fields: [
               { label: "ID", value: detailValue(record.id) },
               { label: "工号", value: detailValue(record.username) },
               { label: "姓名", value: detailValue(record.displayLabel || record.displayName) },
-              { label: "职位", value: getRoleLabel(record.role) },
-              { label: "权限等级", value: detailValue(record.permissionLevel) },
-              { label: "部门", value: detailValue(record.department) },
+              { label: "職位", value: getRoleLabel(record.role) },
+              { label: "權限等級", value: detailValue(record.permissionLevel) },
+              { label: "部門", value: detailValue(record.department) },
             ],
           },
           {
-            title: "联系方式与组织",
+            title: "聯絡方式與組織",
             fields: [
               { label: "主管", value: detailValue(record.supervisorLabel || record.supervisorUser) },
-              { label: "邮箱", value: detailValue(record.email) },
-              { label: "电话", value: detailValue(record.phone) },
-              { label: "创建时间", value: formatDateTime(record.createdAt) },
-              { label: "更新时间", value: formatDateTime(record.updatedAt) },
+              { label: "信箱", value: detailValue(record.email) },
+              { label: "電話", value: detailValue(record.phone) },
+              { label: "建立時間", value: formatDateTime(record.createdAt) },
+              { label: "更新時間", value: formatDateTime(record.updatedAt) },
             ],
           },
         ];
@@ -3427,7 +3481,7 @@
           upsertTaskSystemItem("handovers", responsePayload.item);
           resetHandoverForm();
           handoverFormOpen.value = false;
-          setTaskActionMessage("交接班记录已保存。");
+          setTaskActionMessage("交接班記錄已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3456,7 +3510,7 @@
           upsertTaskSystemItem("tasks", responsePayload.item);
           resetTaskForm();
           taskFormOpen.value = false;
-          setTaskActionMessage("任务已保存。");
+          setTaskActionMessage("任務已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3481,7 +3535,7 @@
           upsertTaskSystemItem("users", responsePayload.item);
           resetUserForm();
           userFormOpen.value = false;
-          setTaskActionMessage("用户信息已保存。");
+          setTaskActionMessage("使用者資訊已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3508,7 +3562,7 @@
           );
           upsertTaskSystemItem("users", responsePayload.item);
           closePermissionForm();
-          setTaskActionMessage("用户权限已更新。");
+          setTaskActionMessage("使用者權限已更新。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3535,7 +3589,7 @@
           upsertTaskSystemItem("shifts", responsePayload.item);
           resetShiftForm();
           shiftFormOpen.value = false;
-          setTaskActionMessage("班次设置已保存。");
+          setTaskActionMessage("班次設定已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3562,7 +3616,7 @@
           upsertTaskSystemItem("floors", responsePayload.item);
           resetFloorForm();
           floorFormOpen.value = false;
-          setTaskActionMessage("楼层设置已保存。");
+          setTaskActionMessage("樓層設定已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3589,7 +3643,7 @@
           upsertTaskSystemItem("departments", responsePayload.item);
           resetDepartmentForm();
           departmentFormOpen.value = false;
-          setTaskActionMessage("部门设置已保存。");
+          setTaskActionMessage("部門設定已儲存。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3603,7 +3657,7 @@
 
       async function deleteHandover(item) {
         if (!isTaskFormIdle()) return;
-        const confirmed = window.confirm(`确认删除交接班记录 #${item.id}？此操作会同时删除附件。`);
+        const confirmed = window.confirm(`確認刪除交接班記錄 #${item.id}？此操作會同時刪除附件。`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3621,7 +3675,7 @@
             handoverFormOpen.value = false;
             resetHandoverForm();
           }
-          setTaskActionMessage("交接班记录已删除。");
+          setTaskActionMessage("交接班記錄已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3635,7 +3689,7 @@
 
       async function deleteTask(item) {
         if (!isTaskFormIdle()) return;
-        const confirmed = window.confirm(`确认删除任务 #${item.id}？此操作会同时删除附件。`);
+        const confirmed = window.confirm(`確認刪除任務 #${item.id}？此操作會同時刪除附件。`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3648,7 +3702,7 @@
             taskFormOpen.value = false;
             resetTaskForm();
           }
-          setTaskActionMessage("任务已删除。");
+          setTaskActionMessage("任務已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3664,7 +3718,7 @@
         if (!isTaskFormIdle()) return;
         const username = userForm.originalUsername || userForm.username;
         if (!username) return;
-        const confirmed = window.confirm(`确认删除账号 ${username}？此操作不可撤销。`);
+        const confirmed = window.confirm(`確認刪除帳號 ${username}？此操作不可復原。`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3674,7 +3728,7 @@
             (user) => user.username !== username
           );
           closeUserForm();
-          setTaskActionMessage("用户已删除。");
+          setTaskActionMessage("使用者已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3695,7 +3749,7 @@
             method: "POST",
           });
           upsertTaskSystemItem("tasks", responsePayload.item);
-          setTaskActionMessage("任务已领取。");
+          setTaskActionMessage("任務已領取。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3713,7 +3767,7 @@
         const reason = taskRejectForm.reason.trim();
         if (!taskId) return;
         if (!reason) {
-          setTaskActionMessage("请输入驳回理由。", "error");
+          setTaskActionMessage("請輸入駁回理由。", "error");
           return;
         }
         taskActionSubmitting.value = true;
@@ -3725,7 +3779,7 @@
           });
           upsertTaskSystemItem("tasks", responsePayload.item);
           closeTaskRejectDialog();
-          setTaskActionMessage("任务已驳回。");
+          setTaskActionMessage("任務已駁回。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3743,7 +3797,7 @@
         const content = taskSubmitForm.content.trim();
         if (!taskId) return;
         if (!content) {
-          setTaskActionMessage("请输入提交内容。", "error");
+          setTaskActionMessage("請輸入提交內容。", "error");
           return;
         }
         taskActionSubmitting.value = true;
@@ -3756,7 +3810,7 @@
           );
           upsertTaskSystemItem("tasks", responsePayload.item);
           closeTaskSubmitDialog();
-          setTaskActionMessage("任务已提交审核。");
+          setTaskActionMessage("任務已提交審核。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3774,7 +3828,7 @@
         const score = Number(taskReviewForm.score);
         if (!taskId) return;
         if (!Number.isFinite(score) || score < 0 || score > 100) {
-          setTaskActionMessage("评分必须在 0-100 之间。", "error");
+          setTaskActionMessage("評分必須在 0-100 之間。", "error");
           return;
         }
         taskActionSubmitting.value = true;
@@ -3789,7 +3843,7 @@
           });
           upsertTaskSystemItem("tasks", responsePayload.item);
           closeTaskReviewDialog();
-          setTaskActionMessage("评分已提交。");
+          setTaskActionMessage("評分已提交。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3813,7 +3867,7 @@
 
       async function deleteShift(item) {
         if (!isTaskFormIdle()) return;
-        const confirmed = window.confirm(`确认删除班次“${item.name}”？`);
+        const confirmed = window.confirm(`確認刪除班次「${item.name}」？`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3822,7 +3876,7 @@
           taskSystem.value.shifts = (taskSystem.value.shifts || []).filter(
             (shift) => Number(shift.id) !== Number(item.id)
           );
-          setTaskActionMessage("班次已删除。");
+          setTaskActionMessage("班次已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3836,7 +3890,7 @@
 
       async function deleteFloor(item) {
         if (!isTaskFormIdle()) return;
-        const confirmed = window.confirm(`确认删除楼层“${item.name}”？`);
+        const confirmed = window.confirm(`確認刪除樓層「${item.name}」？`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3845,7 +3899,7 @@
           taskSystem.value.floors = (taskSystem.value.floors || []).filter(
             (floor) => Number(floor.id) !== Number(item.id)
           );
-          setTaskActionMessage("楼层已删除。");
+          setTaskActionMessage("樓層已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3859,7 +3913,7 @@
 
       async function deleteDepartment(item) {
         if (!isTaskFormIdle()) return;
-        const confirmed = window.confirm(`确认删除部门“${item.name}”？`);
+        const confirmed = window.confirm(`確認刪除部門「${item.name}」？`);
         if (!confirmed) return;
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3868,7 +3922,7 @@
           taskSystem.value.departments = (taskSystem.value.departments || []).filter(
             (department) => Number(department.id) !== Number(item.id)
           );
-          setTaskActionMessage("部门已删除。");
+          setTaskActionMessage("部門已刪除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -3894,7 +3948,7 @@
           const response = await fetch("/api/task-system/export", {
             method: "POST",
             credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...getClientInstanceHeaders() },
             body: JSON.stringify({
               type,
               format,
@@ -3906,7 +3960,7 @@
           }
           if (!response.ok) {
             const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "导出失败。");
+            throw new Error(payload.message || "匯出失敗。");
           }
           const blob = await response.blob();
           const objectUrl = URL.createObjectURL(blob);
@@ -3919,7 +3973,7 @@
           link.click();
           link.remove();
           URL.revokeObjectURL(objectUrl);
-          setTaskActionMessage("导出成功。");
+          setTaskActionMessage("匯出成功。");
         } catch (errorInstance) {
           if (errorInstance instanceof Error && errorInstance.message === AUTH_REQUIRED_ERROR) {
             await logout();
@@ -3971,13 +4025,13 @@
 
         try {
           if (!exportForm.columns.length) {
-            throw new Error("请至少选择一个导出字段。");
+            throw new Error("請至少選擇一個匯出欄位。");
           }
 
           const response = await fetch("/api/export-excel", {
             method: "POST",
             credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...getClientInstanceHeaders() },
             body: JSON.stringify({
               page: activePage.value,
               filters: exportForm.filters,
@@ -3991,7 +4045,7 @@
 
           if (!response.ok) {
             const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "导出失败。");
+            throw new Error(payload.message || "匯出失敗。");
           }
 
           const blob = await response.blob();
@@ -4005,10 +4059,10 @@
           link.click();
           link.remove();
           URL.revokeObjectURL(objectUrl);
-          setExportMessage("Excel 导出成功。", "success");
+          setExportMessage("Excel 匯出成功。", "success");
         } catch (errorInstance) {
           if (errorInstance instanceof Error && errorInstance.message === AUTH_REQUIRED_ERROR) {
-            setExportMessage("登录状态已失效，请重新登录。", "error");
+            setExportMessage("登入狀態已失效，請重新登入。", "error");
             await logout();
           } else {
             setExportMessage(errorInstance instanceof Error ? errorInstance.message : String(errorInstance), "error");

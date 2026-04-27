@@ -11,9 +11,9 @@ def export_task_data(export_type: str, export_format: str, filters: dict) -> tup
     if normalized_type in {"operations", "operationlogs", "operation_logs"}:
         normalized_type = "operation"
     if normalized_type not in {"handover", "task", "operation"}:
-        raise ValueError("导出类型无效")
+        raise ValueError("匯出類型無效")
     if normalized_format != "excel":
-        raise ValueError("仅支持 Excel 导出")
+        raise ValueError("僅支援 Excel 匯出")
 
     if normalized_type == "handover":
         rows = list_handover_records(filters)
@@ -33,50 +33,50 @@ def _export_excel(export_type: str, rows: list[dict]) -> tuple[BytesIO, str, str
 
     if export_type == "handover":
         headers = [
-            ("title", "标题"),
+            ("title", "標題"),
             ("shiftName", "交班班次"),
             ("receiverShiftName", "接班班次"),
-            ("floorName", "楼层"),
-            ("recordTime", "记录时间"),
+            ("floorName", "樓層"),
+            ("recordTime", "記錄時間"),
             ("handoverUser", "交班人"),
             ("receiverUser", "接班人"),
             ("receiverSupervisorLabel", "主管"),
-            ("mentionUserLabels", "@人员"),
-            ("workSummary", "当班情况"),
-            ("precautions", "注意事项"),
-            ("pendingItems", "未完成事项"),
-            ("keywords", "关键词"),
+            ("mentionUserLabels", "@人員"),
+            ("workSummary", "當班情況"),
+            ("precautions", "注意事項"),
+            ("pendingItems", "未完成事項"),
+            ("keywords", "關鍵詞"),
         ]
     elif export_type == "task":
         headers = [
-            ("title", "任务标题"),
-            ("status", "状态"),
-            ("priority", "优先级"),
-            ("assigneeUser", "负责人"),
-            ("creatorUser", "创建人"),
-            ("startAt", "开始时间"),
-            ("dueAt", "到期时间"),
-            ("handoverRecordId", "关联交接记录"),
+            ("title", "任務標題"),
+            ("status", "狀態"),
+            ("priority", "優先級"),
+            ("assigneeUser", "負責人"),
+            ("creatorUser", "建立人"),
+            ("startAt", "開始時間"),
+            ("dueAt", "到期時間"),
+            ("handoverRecordId", "關聯交接記錄"),
             ("supervisorLabel", "主管"),
-            ("mentionUserLabels", "@人员"),
-            ("rejectReason", "驳回理由"),
-            ("rejectedBy", "驳回人"),
-            ("rejectedAt", "驳回时间"),
-            ("reviewStatusLabel", "审核状态"),
-            ("reviewAverageScore", "审核均分"),
-            ("reviewGrade", "审核等级"),
-            ("description", "任务说明"),
+            ("mentionUserLabels", "@人員"),
+            ("rejectReason", "駁回理由"),
+            ("rejectedBy", "駁回人"),
+            ("rejectedAt", "駁回時間"),
+            ("reviewStatusLabel", "審核狀態"),
+            ("reviewAverageScore", "審核均分"),
+            ("reviewGrade", "審核等級"),
+            ("description", "任務說明"),
         ]
     else:
         headers = [
             ("id", "ID"),
             ("operatorLabel", "操作人"),
-            ("operatorUser", "操作人工号"),
-            ("operatedAt", "操作时间"),
-            ("pageName", "操作页面"),
+            ("operatorUser", "操作人工號"),
+            ("operatedAt", "操作時間"),
+            ("pageName", "操作頁面"),
             ("actionType", "操作功能"),
-            ("recordLabel", "操作了哪条记录"),
-            ("recordId", "记录ID"),
+            ("recordLabel", "操作了哪條記錄"),
+            ("recordId", "記錄ID"),
         ]
 
     sheet.append([header for _, header in headers])
