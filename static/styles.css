@@ -280,6 +280,7 @@ body::after {
 
 .notification-bell-wrap {
   position: relative;
+  z-index: 80;
   display: inline-flex;
   flex: 0 0 42px;
   align-items: center;
@@ -348,16 +349,17 @@ body::after {
 }
 
 .notification-popover-layer {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
   z-index: 2147483000;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   pointer-events: none;
 }
 
 .notification-panel.card {
-  position: absolute;
-  top: 78px;
-  right: 276px;
+  position: relative;
   width: 420px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 120px);
@@ -1123,6 +1125,10 @@ body::after {
 
 .task-layout-list-only {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.task-layout-list-only .task-table-card {
+  min-height: clamp(520px, calc(100vh - 360px), 860px);
 }
 
 .muted-line,
@@ -2759,10 +2765,16 @@ td {
   }
 
   .notification-panel.card {
-    left: 12px;
-    right: 12px;
-    width: auto;
-    max-width: none;
+    left: auto;
+    right: auto;
+    width: min(420px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+
+  .notification-popover-layer {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 24px);
   }
 
   .thumbnail-mini-bar-row {

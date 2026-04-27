@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AA 任务看板系统</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-10" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-11" />
   </head>
   <body>
     {% raw %}
@@ -138,12 +138,11 @@
                 <span class="notification-bell-icon">🔔</span>
                 <span v-if="unreadNotificationCount > 0" class="notification-badge">{{ unreadNotificationCount }}</span>
               </button>
-              <teleport to="body">
-                <div
-                  v-if="isAuthenticated && systemMode === 'tasks' && notificationPanelOpen"
-                  class="notification-popover-layer"
-                >
-                  <section class="notification-panel card">
+              <div
+                v-if="isAuthenticated && systemMode === 'tasks' && notificationPanelOpen"
+                class="notification-popover-layer"
+              >
+                <section class="notification-panel card">
                     <div class="notification-panel-head">
                       <strong>通知提醒</strong>
                       <div class="notification-panel-meta">
@@ -172,9 +171,8 @@
                       <strong>{{ item.title }}</strong>
                       <small>{{ item.description }}</small>
                     </button>
-                  </section>
-                </div>
-              </teleport>
+                </section>
+              </div>
             </div>
             <button v-if="systemMode === 'dashboard'" class="btn-primary" @click="openExportDialog">Excel 导出</button>
             <button class="btn-secondary" @click="refreshActivePage">刷新</button>
