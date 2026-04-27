@@ -13,7 +13,6 @@
   const DEFAULT_LANGUAGE = "zh-Hant";
   const LANGUAGE_MODES = [
     { key: "zh-Hant", label: "繁體", shortLabel: "繁" },
-    { key: "en", label: "English", shortLabel: "EN" },
     { key: "zh-Hans", label: "简体", shortLabel: "简" },
   ];
   const TRANSLATABLE_ATTRIBUTES = ["placeholder", "title", "aria-label"];
@@ -261,144 +260,6 @@
     "齑": "齏", "齿": "齒", "龀": "齔", "龃": "齟", "龄": "齡", "龅": "齙", "龆": "齠", "龇": "齜", "龈": "齦",
     "龉": "齬", "龊": "齪", "龋": "齲", "龌": "齷", "龙": "龍", "龚": "龔", "龛": "龕"
   };
-  const ENGLISH_PHRASES = {
-    "目录": "Menu",
-    "系统目录": "System Directory",
-    "关闭": "Close",
-    "任务系统": "Task System",
-    "看板系统": "Dashboard System",
-    "交接班记录": "Handover Records",
-    "任务跟踪": "Task Tracking",
-    "用户管理": "User Management",
-    "操作记录": "Operation Logs",
-    "系统设置": "System Settings",
-    "通知提醒": "Notifications",
-    "清除已读": "Clear Read",
-    "暂无未读": "No unread",
-    "当前没有提醒。": "No notifications.",
-    "刷新": "Refresh",
-    "个人信息": "Profile",
-    "退出登录": "Log Out",
-    "姓名": "Name",
-    "工号": "Employee ID",
-    "部门": "Department",
-    "职位": "Role",
-    "主管": "Supervisor",
-    "邮箱": "Email",
-    "电话": "Phone",
-    "密码": "Password",
-    "登录": "Log In",
-    "登录中...": "Logging in...",
-    "请输入工号和密码登录系统。默认超级管理员工号为 `admin` / `123456`。": "Enter your employee ID and password. Default super admin is `admin` / `123456`.",
-    "任务查询": "Task Search",
-    "可按关键词、状态、负责人筛选任务并跟踪进度。": "Filter tasks by keyword, status, and owner.",
-    "关键词": "Keyword",
-    "状态": "Status",
-    "负责人": "Owner",
-    "全部": "All",
-    "新增": "New",
-    "导出 Excel": "Export Excel",
-    "创建与分配任务": "Create and Assign Task",
-    "任务可关联交接班记录，支持状态、优先级和起止时间。": "Tasks can be linked to handover records and have status, priority, start and due time.",
-    "任务标题": "Task Title",
-    "优先级": "Priority",
-    "@人员": "@ Users",
-    "开始时间": "Start Time",
-    "到期时间": "Due Time",
-    "关联交接班记录": "Linked Handover Record",
-    "任务说明": "Task Description",
-    "附件上传": "Attachments",
-    "保存任务": "Save Task",
-    "保存中...": "Saving...",
-    "删除": "Delete",
-    "重置": "Reset",
-    "取消": "Cancel",
-    "提交": "Submit",
-    "评分": "Review",
-    "编辑": "Edit",
-    "领取": "Claim",
-    "驳回": "Reject",
-    "提交任务审核": "Submit Task for Review",
-    "请填写本次处理结果": "Please enter the result",
-    "提交内容": "Submission Content",
-    "回复附件": "Reply Attachments",
-    "提交审核": "Submit for Review",
-    "提交中...": "Submitting...",
-    "任务审核评分": "Task Review Score",
-    "请输入 0-100 分": "Enter a score from 0 to 100",
-    "评语": "Comment",
-    "提交评分": "Submit Score",
-    "任务清单": "Task List",
-    "默认按创建时间排序，点击表头排序，按住 Shift 可叠加多重排序。": "Default sorting is by creation time. Click headers to sort; hold Shift for multi-sort.",
-    "重置排序": "Reset Sort",
-    "标题": "Title",
-    "创建时间": "Created At",
-    "关联交接": "Linked Handover",
-    "驳回理由": "Reject Reason",
-    "审核": "Review",
-    "附件": "Attachment",
-    "操作": "Action",
-    "下载": "Download",
-    "当前条件下没有任务数据": "No task data for current filters",
-    "待审核": "Pending Review",
-    "未开始": "Not Started",
-    "进行中": "In Progress",
-    "已完成": "Completed",
-    "已驳回": "Rejected",
-    "低": "Low",
-    "中": "Medium",
-    "高": "High",
-    "审核通过": "Approved",
-    "审核未通过": "Not Approved",
-    "优秀": "Excellent",
-    "良": "Good",
-    "不合格": "Failed",
-    "交接班查询": "Handover Search",
-    "创建交接班记录": "Create Handover Record",
-    "历史交接班": "Handover History",
-    "交班班次": "Handover Shift",
-    "接班班次": "Next Shift",
-    "楼层": "Floor",
-    "交班人": "Handover User",
-    "接班人": "Receiver",
-    "当班情况": "Work Summary",
-    "注意事项": "Precautions",
-    "未完成事项": "Pending Items",
-    "保存交接记录": "Save Handover",
-    "账号列表": "Account List",
-    "保存用户": "Save User",
-    "保存权限": "Save Permission",
-    "班次设置": "Shift Settings",
-    "楼层设置": "Floor Settings",
-    "部门设置": "Department Settings",
-    "操作人": "Operator",
-    "操作时间": "Operation Time",
-    "操作页面": "Page",
-    "操作功能": "Action",
-    "增加": "Create",
-    "修改": "Update",
-    "查看": "View",
-    "普通用户": "User",
-    "线组长": "Line Leader",
-    "科长": "Section Chief",
-    "部长": "Department Head",
-    "超级管理员": "Super Admin",
-    "任务提醒": "Task Reminder",
-    "任务到期提醒": "Task Due Reminder",
-    "任务待评分": "Task Review Needed",
-    "任务审核通知": "Task Review Notification",
-    "任务状态为待审核": "Task Pending Review",
-    "任务审核通过": "Task Approved",
-    "任务审核未通过": "Task Not Approved",
-    "详情": "Details",
-    "关闭预览": "Close Preview",
-    "导出字段": "Export Fields",
-    "开始导出": "Start Export",
-    "正在加载系统数据...": "Loading system data...",
-    "系统加载失败": "System load failed",
-    "重新加载": "Reload"
-  };
-
   function convertToTraditional(text) {
     return String(text || "")
       .split("")
@@ -406,22 +267,8 @@
       .join("");
   }
 
-  function translateToEnglish(text) {
-    const source = String(text || "");
-    if (!source.trim()) return source;
-    if (ENGLISH_PHRASES[source]) return ENGLISH_PHRASES[source];
-    let translated = source;
-    const entries = Object.entries(ENGLISH_PHRASES).sort((left, right) => right[0].length - left[0].length);
-    for (const [from, to] of entries) {
-      if (!from || !translated.includes(from)) continue;
-      translated = translated.split(from).join(to);
-    }
-    return translated;
-  }
-
   function translateUiText(text, language) {
     if (language === "zh-Hant") return convertToTraditional(text);
-    if (language === "en") return translateToEnglish(text);
     return String(text || "");
   }
 
@@ -1490,6 +1337,7 @@
         comment: "",
       });
       const userForm = reactive({
+        originalUsername: "",
         username: "",
         displayName: "",
         department: "",
@@ -2612,6 +2460,7 @@
       }
 
       function resetUserForm() {
+        userForm.originalUsername = "";
         userForm.username = "";
         userForm.displayName = "";
         userForm.department = "";
@@ -3318,6 +3167,7 @@
       }
 
       function editUser(item) {
+        userForm.originalUsername = item.username;
         userForm.username = item.username;
         userForm.displayName = item.displayName;
         userForm.department = item.department;
@@ -3799,6 +3649,32 @@
             resetTaskForm();
           }
           setTaskActionMessage("任务已删除。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function deleteCurrentUser() {
+        if (!isTaskFormIdle()) return;
+        const username = userForm.originalUsername || userForm.username;
+        if (!username) return;
+        const confirmed = window.confirm(`确认删除账号 ${username}？此操作不可撤销。`);
+        if (!confirmed) return;
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          await requestJson(`/api/task-system/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+          taskSystem.value.users = (taskSystem.value.users || []).filter(
+            (user) => user.username !== username
+          );
+          closeUserForm();
+          setTaskActionMessage("用户已删除。");
           void fetchTaskSystem({ showLoading: false, resetForms: false });
         } catch (errorInstance) {
           setTaskActionMessage(
@@ -5212,6 +5088,7 @@
         deleteTask,
         deleteCurrentHandover,
         deleteCurrentTask,
+        deleteCurrentUser,
         editUser,
         openPermissionForm,
         closePermissionForm,

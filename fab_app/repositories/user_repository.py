@@ -158,3 +158,18 @@ def update_user_by_username(username: str, payload: dict) -> None:
             payload,
         )
         connection.commit()
+
+
+def clear_supervisor_user(supervisor_username: str) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE USER SET supervisor_user = '' WHERE supervisor_user = ?",
+            (supervisor_username,),
+        )
+        connection.commit()
+
+
+def delete_user_by_username(username: str) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM USER WHERE user = ?", (username,))
+        connection.commit()

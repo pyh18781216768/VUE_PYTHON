@@ -145,6 +145,31 @@ def save_user(payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
     return item
 
 
+def delete_user(username: str, actor_username: str) -> None:
+    target_username = _normalize_text(username)
+    if not target_username:
+        raise ValueError("工号不能为空")
+    if target_username == _normalize_text(actor_username):
+        raise ValueError("不能删除当前登录账号")
+
+    existing = user_repository.fetch_user(target_username)
+    if not existing:
+        raise ValueError("用户不存在")
+    if _normalize_role(existing["role"]) == "admin" and not _actor_is_super_admin(actor_username):
+        raise ValueError("只有超级管理员可以删除超级管理员账号")
+
+    item = _build_user_summary(existing)
+    user_repository.clear_supervisor_user(target_username)
+    user_repository.delete_user_by_username(target_username)
+    _safe_record_operation(
+        actor_username,
+        "用户管理",
+        "删除",
+        _user_operation_label(item),
+        item["id"],
+    )
+
+
 def assign_user_permission(
     target_username: str,
     role: str,

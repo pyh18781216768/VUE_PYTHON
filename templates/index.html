@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-08" />
+    <title>AA 任务看板系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-10" />
   </head>
   <body>
     {% raw %}
@@ -18,9 +18,7 @@
         <article class="auth-card card">
           <div class="section-head auth-head">
             <div>
-              <p class="eyebrow">Fab Access</p>
-              <h1 class="auth-title">Semiconductor Quality Gateway</h1>
-              <p class="auth-copy">请输入工号和密码登录系统。默认超级管理员工号为 `admin` / `123456`。</p>
+              <h1 class="auth-title">AA 看板任务登录界面</h1>
             </div>
           </div>
 
@@ -55,7 +53,7 @@
               <button
                 class="drawer-language"
                 type="button"
-                :title="`单击切换到：${nextLanguageLabel}`"
+                :title="`切换到：${nextLanguageLabel}`"
                 @click="cycleLanguage"
               >
                 {{ languageSwitchLabel }}
@@ -200,8 +198,7 @@
           <header v-if="false" class="hero hero-simple">
             <div>
               <p class="eyebrow">Task System</p>
-              <h1>交接班与任务协同系统</h1>
-              <p class="hero-copy">登录后默认进入任务系统，统一处理交接班、任务、提醒、统计和导出。</p>
+              <h1>AA 任务看板系统</h1>
             </div>
           </header>
 
@@ -214,7 +211,6 @@
               <div class="section-head">
                 <div>
                   <h2>交接班查询</h2>
-                  <p>支持按日期、班次、交接人、接班人和关键词检索。</p>
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="openHandoverForm">新增</button>
@@ -257,7 +253,6 @@
                 <div class="section-head">
                   <div>
                     <h2>创建交接班记录</h2>
-                    <p>支持当班情况、注意事项、未完成事项和附件上传。</p>
                   </div>
                   <button class="btn-ghost" type="button" @click="closeHandoverForm">关闭</button>
                 </div>
@@ -323,7 +318,6 @@
                 <div class="section-head">
                   <div>
                     <h2>历史交接班</h2>
-                    <p>默认按创建时间排序，点击表头排序，按住 Shift 可叠加多重排序。</p>
                   </div>
                   <button class="btn-secondary" type="button" @click="resetHandoverSort">重置排序</button>
                 </div>
@@ -332,67 +326,67 @@
                     <thead>
                       <tr>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('id', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('id', $event)">
                             <strong>ID</strong>
                             <span>{{ getHandoverSortIndicator('id') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('keywords', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('keywords', $event)">
                             <strong>关键词</strong>
                             <span>{{ getHandoverSortIndicator('keywords') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('shiftName', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('shiftName', $event)">
                             <strong>交班班次</strong>
                             <span>{{ getHandoverSortIndicator('shiftName') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('receiverShiftName', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('receiverShiftName', $event)">
                             <strong>接班班次</strong>
                             <span>{{ getHandoverSortIndicator('receiverShiftName') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('floorName', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('floorName', $event)">
                             <strong>楼层</strong>
                             <span>{{ getHandoverSortIndicator('floorName') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('createdAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('createdAt', $event)">
                             <strong>创建时间</strong>
                             <span>{{ getHandoverSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('handoverUser', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('handoverUser', $event)">
                             <strong>交班人</strong>
                             <span>{{ getHandoverSortIndicator('handoverUser') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('receiverUser', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('receiverUser', $event)">
                             <strong>接班人</strong>
                             <span>{{ getHandoverSortIndicator('receiverUser') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('receiverSupervisorLabel', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('receiverSupervisorLabel', $event)">
                             <strong>主管</strong>
                             <span>{{ getHandoverSortIndicator('receiverSupervisorLabel') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('mentionUserLabels', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('mentionUserLabels', $event)">
                             <strong>@人员</strong>
                             <span>{{ getHandoverSortIndicator('mentionUserLabels') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleHandoverSort('pendingItems', $event)">
+                          <button class="sort-button" type="button" @click="toggleHandoverSort('pendingItems', $event)">
                             <strong>未完成事项</strong>
                             <span>{{ getHandoverSortIndicator('pendingItems') }}</span>
                           </button>
@@ -453,7 +447,6 @@
               <div class="section-head">
                 <div>
                   <h2>任务查询</h2>
-                  <p>可按关键词、状态、负责人筛选任务并跟踪进度。</p>
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="openTaskForm">新增</button>
@@ -484,7 +477,6 @@
                 <div class="section-head">
                   <div>
                     <h2>创建与分配任务</h2>
-                    <p>任务可关联交接班记录，支持状态、优先级和起止时间。</p>
                   </div>
                   <button class="btn-ghost" type="button" @click="closeTaskForm">关闭</button>
                 </div>
@@ -553,7 +545,7 @@
                     <div class="section-head">
                       <div>
                         <h2>驳回任务</h2>
-                        <p>{{ taskRejectForm.title || '请填写驳回理由' }}</p>
+                        <p v-if="taskRejectForm.title">{{ taskRejectForm.title }}</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeTaskRejectDialog">关闭</button>
                     </div>
@@ -581,7 +573,7 @@
                     <div class="section-head">
                       <div>
                         <h2>提交任务审核</h2>
-                        <p>{{ taskSubmitForm.title || '请填写本次处理结果' }}</p>
+                        <p v-if="taskSubmitForm.title">{{ taskSubmitForm.title }}</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeTaskSubmitDialog">关闭</button>
                     </div>
@@ -613,7 +605,7 @@
                     <div class="section-head">
                       <div>
                         <h2>任务审核评分</h2>
-                        <p>{{ taskReviewForm.title || '请输入 0-100 分' }}</p>
+                        <p v-if="taskReviewForm.title">{{ taskReviewForm.title }}</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeTaskReviewDialog">关闭</button>
                     </div>
@@ -642,7 +634,6 @@
                 <div class="section-head">
                   <div>
                     <h2>任务清单</h2>
-                    <p>默认按创建时间排序，点击表头排序，按住 Shift 可叠加多重排序。</p>
                   </div>
                   <button class="btn-secondary" type="button" @click="resetTaskSort">重置排序</button>
                 </div>
@@ -651,73 +642,73 @@
                     <thead>
                       <tr>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('id', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('id', $event)">
                             <strong>ID</strong>
                             <span>{{ getTaskSortIndicator('id') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('title', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('title', $event)">
                             <strong>标题</strong>
                             <span>{{ getTaskSortIndicator('title') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('status', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('status', $event)">
                             <strong>状态</strong>
                             <span>{{ getTaskSortIndicator('status') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('priority', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('priority', $event)">
                             <strong>优先级</strong>
                             <span>{{ getTaskSortIndicator('priority') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('assigneeUser', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('assigneeUser', $event)">
                             <strong>负责人</strong>
                             <span>{{ getTaskSortIndicator('assigneeUser') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('createdAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('createdAt', $event)">
                             <strong>创建时间</strong>
                             <span>{{ getTaskSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('startAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('startAt', $event)">
                             <strong>开始时间</strong>
                             <span>{{ getTaskSortIndicator('startAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('dueAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('dueAt', $event)">
                             <strong>到期时间</strong>
                             <span>{{ getTaskSortIndicator('dueAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('handoverRecordId', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('handoverRecordId', $event)">
                             <strong>关联交接</strong>
                             <span>{{ getTaskSortIndicator('handoverRecordId') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('supervisorLabel', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('supervisorLabel', $event)">
                             <strong>主管</strong>
                             <span>{{ getTaskSortIndicator('supervisorLabel') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('mentionUserLabels', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('mentionUserLabels', $event)">
                             <strong>@人员</strong>
                             <span>{{ getTaskSortIndicator('mentionUserLabels') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleTaskSort('rejectReason', $event)">
+                          <button class="sort-button" type="button" @click="toggleTaskSort('rejectReason', $event)">
                             <strong>驳回理由</strong>
                             <span>{{ getTaskSortIndicator('rejectReason') }}</span>
                           </button>
@@ -801,7 +792,6 @@
               <div class="section-head">
                 <div>
                   <h2>用户查询</h2>
-                  <p>支持按关键词和职位检索账号。</p>
                 </div>
                 <button class="btn-secondary" type="button" @click="openUserForm">新增</button>
               </div>
@@ -825,14 +815,13 @@
                 <div class="section-head">
                   <div>
                     <h2>用户管理</h2>
-                    <p>可创建账号；只有超级管理员可以设置或调整职位权限。</p>
                   </div>
                   <button class="btn-ghost" type="button" @click="closeUserForm">关闭</button>
                 </div>
                 <form class="task-form-grid user-form-grid" @submit.prevent="submitUser">
                   <label>
                     <span>工号</span>
-                    <input v-model.trim="userForm.username" type="text" placeholder="输入工号" />
+                    <input v-model.trim="userForm.username" type="text" placeholder="输入工号" :readonly="Boolean(userForm.originalUsername)" />
                   </label>
                   <label>
                     <span>姓名</span>
@@ -866,7 +855,8 @@
                     {{ taskActionMessage }}
                   </p>
                   <div class="profile-actions form-span-2">
-                    <button class="btn-secondary" type="button" @click="resetUserForm">重置</button>
+                    <button v-if="userForm.originalUsername" class="btn-ghost" type="button" @click="deleteCurrentUser">删除</button>
+                    <button v-else class="btn-secondary" type="button" @click="resetUserForm">重置</button>
                     <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '保存中...' : '保存用户' }}</button>
                   </div>
                 </form>
@@ -881,7 +871,6 @@
                     <div class="section-head">
                       <div>
                         <h2>赋予用户权限</h2>
-                        <p>仅超级管理员可调整用户职位与权限等级。</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closePermissionForm">关闭</button>
                     </div>
@@ -918,7 +907,6 @@
                 <div class="section-head">
                   <div>
                     <h2>账号列表</h2>
-                    <p>默认按创建时间排序，点击表头排序，按住 Shift 可叠加多重排序。</p>
                   </div>
                   <button class="btn-secondary" type="button" @click="resetUserSort">重置排序</button>
                 </div>
@@ -927,37 +915,37 @@
                     <thead>
                       <tr>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('id', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('id', $event)">
                             <strong>ID</strong>
                             <span>{{ getUserSortIndicator('id') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('username', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('username', $event)">
                             <strong>工号</strong>
                             <span>{{ getUserSortIndicator('username') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('displayLabel', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('displayLabel', $event)">
                             <strong>姓名</strong>
                             <span>{{ getUserSortIndicator('displayLabel') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('role', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('role', $event)">
                             <strong>职位</strong>
                             <span>{{ getUserSortIndicator('role') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('createdAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('createdAt', $event)">
                             <strong>创建时间</strong>
                             <span>{{ getUserSortIndicator('createdAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleUserSort('updatedAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleUserSort('updatedAt', $event)">
                             <strong>更新时间</strong>
                             <span>{{ getUserSortIndicator('updatedAt') }}</span>
                           </button>
@@ -1001,7 +989,6 @@
               <div class="section-head">
                 <div>
                   <h2>操作记录查询</h2>
-                  <p>记录任务系统内增加、修改、删除、查看四类操作，支持按人、时间段和操作功能筛选。</p>
                 </div>
                 <div class="button-row">
                   <button class="btn-secondary" type="button" @click="resetOperationSort">重置排序</button>
@@ -1033,7 +1020,6 @@
                 <div class="section-head">
                   <div>
                     <h2>操作记录列表</h2>
-                    <p>默认按操作时间倒序排列；点击表头排序，按住 Shift 可叠加多重排序。</p>
                   </div>
                 </div>
                 <div class="table-wrap">
@@ -1041,37 +1027,37 @@
                     <thead>
                       <tr>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('id', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('id', $event)">
                             <strong>ID</strong>
                             <span>{{ getOperationSortIndicator('id') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('operatorLabel', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('operatorLabel', $event)">
                             <strong>操作人</strong>
                             <span>{{ getOperationSortIndicator('operatorLabel') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('operatedAt', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('operatedAt', $event)">
                             <strong>操作时间</strong>
                             <span>{{ getOperationSortIndicator('operatedAt') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('pageName', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('pageName', $event)">
                             <strong>操作页面</strong>
                             <span>{{ getOperationSortIndicator('pageName') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('actionType', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('actionType', $event)">
                             <strong>操作功能</strong>
                             <span>{{ getOperationSortIndicator('actionType') }}</span>
                           </button>
                         </th>
                         <th>
-                          <button class="sort-button" type="button" title="点击排序，按住 Shift 可叠加多重排序" @click="toggleOperationSort('recordLabel', $event)">
+                          <button class="sort-button" type="button" @click="toggleOperationSort('recordLabel', $event)">
                             <strong>操作了哪条记录</strong>
                             <span>{{ getOperationSortIndicator('recordLabel') }}</span>
                           </button>
@@ -1102,7 +1088,6 @@
               <div class="section-head">
                 <div>
                   <h2>班次查询</h2>
-                  <p>支持按班次名称、时间和排序检索。</p>
                 </div>
                 <button class="btn-secondary" type="button" @click="openShiftForm">新增</button>
               </div>
@@ -1122,7 +1107,6 @@
                     <div class="section-head">
                       <div>
                         <h2>新增班次</h2>
-                        <p>用于交接班记录填写时选择对应班次。</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeShiftForm">关闭</button>
                     </div>
@@ -1159,7 +1143,6 @@
                 <div class="section-head">
                   <div>
                     <h2>班次列表</h2>
-                    <p>班次由交接班记录填写时选择，列表内可删除不再需要的班次。</p>
                   </div>
                 </div>
                 <div class="table-wrap">
@@ -1193,7 +1176,6 @@
                 <div class="section-head">
                   <div>
                     <h2>楼层查询</h2>
-                    <p>支持多个楼层设置，可按楼层名称和排序检索。</p>
                   </div>
                   <button class="btn-secondary" type="button" @click="openFloorForm">新增</button>
                 </div>
@@ -1212,7 +1194,6 @@
                     <div class="section-head">
                       <div>
                         <h2>新增楼层</h2>
-                        <p>用于维护系统内可选楼层配置。</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeFloorForm">关闭</button>
                     </div>
@@ -1241,7 +1222,6 @@
                 <div class="section-head">
                   <div>
                     <h2>楼层列表</h2>
-                    <p>楼层可按需要新增多个，列表内可删除不再需要的楼层。</p>
                   </div>
                 </div>
                 <div class="table-wrap">
@@ -1273,7 +1253,6 @@
                 <div class="section-head">
                   <div>
                     <h2>部门查询</h2>
-                    <p>维护新增用户时可选择的部门。</p>
                   </div>
                   <button class="btn-secondary" type="button" @click="openDepartmentForm">新增</button>
                 </div>
@@ -1292,7 +1271,6 @@
                     <div class="section-head">
                       <div>
                         <h2>新增部门</h2>
-                        <p>用于新增或编辑用户时选择部门。</p>
                       </div>
                       <button class="btn-ghost" type="button" @click="closeDepartmentForm">关闭</button>
                     </div>
@@ -1321,7 +1299,6 @@
                 <div class="section-head">
                   <div>
                     <h2>部门列表</h2>
-                    <p>部门用于用户新增和编辑时选择，列表内可删除不再需要的部门。</p>
                   </div>
                 </div>
                 <div class="table-wrap">
@@ -1384,12 +1361,10 @@
               <div class="thumbnail-summary-block">
                 <span>当前页</span>
                 <strong>{{ dashboardGalleryPage }} / {{ dashboardThumbnailPageCount }}</strong>
-                <small>固定 12 张缩略图，桌面端 3 行 4 列。</small>
               </div>
               <div class="thumbnail-summary-block">
                 <span>缩略图数量</span>
                 <strong>{{ formatInteger(dashboardThumbnailCards.length) }}</strong>
-                <small>当前筛选条件下的可用预览项。</small>
               </div>
             </div>
           </section>
@@ -1443,7 +1418,6 @@
 
             <article v-if="!dashboardVisibleThumbnails.length" class="card thumbnail-empty">
               <strong>当前没有可显示的缩略图</strong>
-              <p>可以尝试调整快照日期或清空搜索条件。</p>
             </article>
           </section>
 
@@ -1664,7 +1638,6 @@
             <div class="section-head">
               <div>
                 <h2>个人信息</h2>
-                <p>账号信息保存在 user.db 中，工号不可修改。</p>
               </div>
               <button class="btn-ghost" @click="closeProfileDialog">关闭</button>
             </div>
@@ -1725,7 +1698,6 @@
             <div class="section-head">
               <div>
                 <h2>Excel 导出</h2>
-                <p>导出当前看板数据，并支持按当前筛选条件自定义字段。</p>
               </div>
               <button class="btn-ghost" @click="closeExportDialog">关闭</button>
             </div>
@@ -1749,7 +1721,6 @@
               <div class="section-head">
                 <div>
                   <h2>导出字段</h2>
-                  <p>勾选需要导出的列，至少保留一个字段。</p>
                 </div>
                 <button class="btn-secondary" type="button" @click="resetExportForm">恢复默认</button>
               </div>
@@ -1791,7 +1762,7 @@
             <div class="section-head">
               <div>
                 <h2>{{ detailDialogTitle }}</h2>
-                <p>{{ detailDialogSubtitle || '双击表格行打开的只读详情。' }}</p>
+                <p v-if="detailDialogSubtitle">{{ detailDialogSubtitle }}</p>
               </div>
               <button class="btn-ghost" type="button" @click="closeDetailDialog">关闭</button>
             </div>
@@ -1885,6 +1856,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-08"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-10"></script>
   </body>
 </html>

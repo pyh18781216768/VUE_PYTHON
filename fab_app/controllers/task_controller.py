@@ -16,6 +16,7 @@ from fab_app.services.task_system_service import (
     delete_handover_record,
     delete_shift_group,
     delete_task,
+    delete_user,
     get_attachment_file,
     get_reminders,
     get_report_summary,
@@ -101,6 +102,16 @@ def assign_task_user_permission(username: str):
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"item": item})
+
+
+@task_blueprint.delete("/api/task-system/users/<path:username>")
+@admin_required
+def delete_task_user(username: str):
+    try:
+        delete_user(username, current_username())
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"message": "用户已删除。"})
 
 
 @task_blueprint.get("/api/task-system/shifts")
