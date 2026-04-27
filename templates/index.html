@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-07" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-08" />
   </head>
   <body>
     {% raw %}
@@ -51,7 +51,17 @@
               <span>系统目录</span>
               <strong>System Directory</strong>
             </div>
-            <button class="drawer-close" @click="navDrawerOpen = false">关闭</button>
+            <div class="drawer-head-actions">
+              <button
+                class="drawer-language"
+                type="button"
+                :title="`单击切换到：${nextLanguageLabel}`"
+                @click="cycleLanguage"
+              >
+                {{ languageSwitchLabel }}
+              </button>
+              <button class="drawer-close" @click="navDrawerOpen = false">关闭</button>
+            </div>
           </div>
 
           <div class="choice-group drawer-mode-switch">
@@ -1875,6 +1885,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-07"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-08"></script>
   </body>
 </html>

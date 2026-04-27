@@ -147,6 +147,29 @@ body::after {
   font-size: 22px;
 }
 
+.drawer-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.drawer-language {
+  padding: 10px 12px;
+  border: 1px solid rgba(45, 212, 191, 0.46);
+  border-radius: 12px;
+  color: #061722;
+  background: linear-gradient(135deg, #67e8f9, #2dd4bf);
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.16);
+}
+
+.drawer-language:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(14, 165, 233, 0.22);
+}
+
 .drawer-close {
   padding: 10px 12px;
 }
