@@ -8,6 +8,7 @@
   const DASHBOARD_THUMBNAILS_PER_PAGE = 12;
   const FLASH_MESSAGE_TIMEOUT_MS = 3000;
   const NOTIFICATION_READ_STORAGE_PREFIX = "fab_notification_reads_";
+  const NOTIFICATION_CLEARED_STORAGE_PREFIX = "fab_notification_cleared_";
 
   const ROUTES = {
     home: "/",
@@ -843,7 +844,7 @@
       const navDrawerOpen = ref(false);
       const notificationPanelOpen = ref(false);
       const notificationReadIds = ref(new Set());
-      let notificationClickTimer = null;
+      const notificationClearedIds = ref(new Set());
 
       const profileDialogOpen = ref(false);
       const profileSaving = ref(false);
@@ -1296,10 +1297,18 @@
           };
         });
         return [...shiftItems, ...taskItems]
-          .filter((item) => item.unread)
-          .sort((left, right) => compareValues(left.time, right.time));
+          .filter((item) => !notificationClearedIds.value.has(item.id))
+          .sort((left, right) => {
+            if (left.unread !== right.unread) return left.unread ? -1 : 1;
+            return compareValues(left.time, right.time);
+          });
       });
-      const unreadNotificationCount = computed(() => notificationItems.value.length);
+      const unreadNotificationCount = computed(() =>
+        notificationItems.value.filter((item) => item.unread).length
+      );
+      const readNotificationCount = computed(() =>
+        notificationItems.value.filter((item) => !item.unread).length
+      );
       const detailDialogTitle = computed(() => {
         const record = detailDialogRecord.value;
         if (!record) return "详情";
@@ -2275,6 +2284,7 @@
           authUser.value = payload.user || authUser.value;
           if (isAuthenticated.value) {
             loadNotificationReads();
+            loadNotificationClears();
             resetProfileForm();
           }
         } catch (errorInstance) {
@@ -2295,6 +2305,7 @@
           isAuthenticated.value = true;
           authUser.value = payload.user;
           loadNotificationReads();
+          loadNotificationClears();
           resetProfileForm();
           applyCurrentPageToState(true);
           systemMode.value = "tasks";
@@ -2317,6 +2328,7 @@
         isAuthenticated.value = false;
         notificationPanelOpen.value = false;
         notificationReadIds.value = new Set();
+        notificationClearedIds.value = new Set();
         authUser.value = {
           username: "",
           displayName: "",
@@ -2407,14 +2419,12 @@
         });
       }
 
-      function clearNotificationClickTimer() {
-        if (!notificationClickTimer) return;
-        window.clearTimeout(notificationClickTimer);
-        notificationClickTimer = null;
-      }
-
       function getNotificationReadStorageKey() {
         return `${NOTIFICATION_READ_STORAGE_PREFIX}${authUser.value.username || "anonymous"}`;
+      }
+
+      function getNotificationClearedStorageKey() {
+        return `${NOTIFICATION_CLEARED_STORAGE_PREFIX}${authUser.value.username || "anonymous"}`;
       }
 
       function loadNotificationReads() {
@@ -2431,10 +2441,31 @@
         }
       }
 
+      function loadNotificationClears() {
+        const rawValue = window.localStorage.getItem(getNotificationClearedStorageKey());
+        if (!rawValue) {
+          notificationClearedIds.value = new Set();
+          return;
+        }
+        try {
+          const ids = JSON.parse(rawValue);
+          notificationClearedIds.value = new Set(Array.isArray(ids) ? ids : []);
+        } catch (errorInstance) {
+          notificationClearedIds.value = new Set();
+        }
+      }
+
       function saveNotificationReads() {
         window.localStorage.setItem(
           getNotificationReadStorageKey(),
           JSON.stringify(Array.from(notificationReadIds.value))
+        );
+      }
+
+      function saveNotificationClears() {
+        window.localStorage.setItem(
+          getNotificationClearedStorageKey(),
+          JSON.stringify(Array.from(notificationClearedIds.value))
         );
       }
 
@@ -2454,16 +2485,19 @@
         saveNotificationReads();
       }
 
-      function handleNotificationClick(item) {
-        clearNotificationClickTimer();
-        notificationClickTimer = window.setTimeout(() => {
-          markNotificationRead(item);
-          notificationClickTimer = null;
-        }, 220);
+      function clearReadNotifications() {
+        const readIds = notificationItems.value
+          .filter((item) => !item.unread)
+          .map((item) => item.id)
+          .filter(Boolean);
+        if (!readIds.length) return;
+        const nextIds = new Set(notificationClearedIds.value);
+        readIds.forEach((id) => nextIds.add(id));
+        notificationClearedIds.value = nextIds;
+        saveNotificationClears();
       }
 
       function openNotificationDetail(item) {
-        clearNotificationClickTimer();
         if (!item) return;
         const relatedRecord = findNotificationDetailRecord(item);
         markNotificationRead(item);
@@ -4171,7 +4205,6 @@
       onBeforeUnmount(() => {
         window.removeEventListener("resize", handleResize);
         window.removeEventListener("popstate", handlePopState);
-        clearNotificationClickTimer();
         clearFlashMessageTimers();
         disposeCharts();
       });
@@ -4188,6 +4221,7 @@
         notificationPanelOpen,
         notificationItems,
         unreadNotificationCount,
+        readNotificationCount,
         attachmentPreviewOpen,
         attachmentPreviewFile,
         detailDialogOpen,
@@ -4310,7 +4344,7 @@
         logout,
         toggleNotificationPanel,
         closeNotificationPanel,
-        handleNotificationClick,
+        clearReadNotifications,
         openNotificationDetail,
         markNotificationRead,
         switchSystem,

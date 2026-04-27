@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260426-32" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-01" />
   </head>
   <body>
     {% raw %}
@@ -140,18 +140,25 @@
                       <strong>通知提醒</strong>
                       <div class="notification-panel-meta">
                         <small>{{ unreadNotificationCount > 0 ? `未读 ${unreadNotificationCount} 条` : '暂无未读' }}</small>
+                        <button
+                          class="notification-close"
+                          type="button"
+                          :disabled="readNotificationCount === 0"
+                          @click="clearReadNotifications"
+                        >
+                          清除已读
+                        </button>
                         <button class="notification-close" type="button" @click="closeNotificationPanel">关闭</button>
                       </div>
                     </div>
-                    <div v-if="!notificationItems.length" class="notification-empty">当前没有未读提醒。</div>
+                    <div v-if="!notificationItems.length" class="notification-empty">当前没有提醒。</div>
                     <button
                       v-for="item in notificationItems"
                       :key="item.id"
                       type="button"
                       :class="['notification-item', { unread: item.unread }]"
-                      title="单击标记已读，双击查看详情"
-                      @click="handleNotificationClick(item)"
-                      @dblclick.prevent="openNotificationDetail(item)"
+                      title="单击查看详情并标记已读"
+                      @click="openNotificationDetail(item)"
                     >
                       <span class="notification-type">{{ item.typeLabel }}</span>
                       <strong>{{ item.title }}</strong>
@@ -1767,6 +1774,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260426-32"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-01"></script>
   </body>
 </html>
