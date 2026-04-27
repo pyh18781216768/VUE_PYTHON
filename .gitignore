@@ -5,8 +5,6 @@ __pycache__/
 *.py[cod]
 
 node_modules/
-offline_packages/
-
 .idea/
 .vscode/
 
