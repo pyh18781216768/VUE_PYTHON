@@ -37,6 +37,8 @@ from fab_app.services.task_system_service import (
     save_task,
     save_user,
     reject_task,
+    review_task_submission,
+    submit_task_for_review,
 )
 
 
@@ -273,6 +275,29 @@ def reject_task_item(task_id: int):
     payload = _read_payload()
     try:
         item = reject_task(task_id, payload.get("reason"), current_username())
+    except (KeyError, ValueError) as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.post("/api/task-system/tasks/<int:task_id>/submit")
+@login_required
+def submit_task_review_item(task_id: int):
+    payload = _read_payload()
+    files = request.files.getlist("attachments")
+    try:
+        item = submit_task_for_review(task_id, payload, files, current_username())
+    except (KeyError, ValueError) as exc:
+        return jsonify({"message": str(exc)}), 400
+    return jsonify({"item": item})
+
+
+@task_blueprint.post("/api/task-system/tasks/<int:task_id>/review")
+@login_required
+def review_task_item(task_id: int):
+    payload = _read_payload()
+    try:
+        item = review_task_submission(task_id, payload, current_username())
     except (KeyError, ValueError) as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"item": item})

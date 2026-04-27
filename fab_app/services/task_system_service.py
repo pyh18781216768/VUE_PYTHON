@@ -24,7 +24,7 @@ DEFAULT_SETTINGS = {
     "permissions.assign_admin": True,
 }
 
-TASK_STATUSES = ("未开始", "进行中", "已完成", "已驳回")
+TASK_STATUSES = ("未开始", "进行中", "待审核", "已完成", "已驳回")
 TASK_PRIORITIES = ("低", "中", "高")
 OPERATION_ACTIONS = ("增加", "修改", "删除", "查看")
 UPLOAD_ROOT = BASE_DIR / "storage" / "uploads"
@@ -518,6 +518,9 @@ def delete_handover_record(record_id: int, actor_username: str | None = None) ->
 
 def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     attachments_by_owner = _build_attachment_lookup("task")
+    submission_attachments_by_owner = _build_attachment_lookup("task_submission")
+    latest_submission_by_task = _build_latest_task_submission_lookup()
+    reviews_by_submission = _build_task_review_lookup()
     handover_rows = handovers if handovers is not None else list_handover_records({})
     handover_supervisors = {
         item["id"]: item["receiverSupervisorLabel"]
@@ -530,7 +533,14 @@ def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None =
     tasks = []
 
     for row in task_repository.fetch_all_tasks():
-        task = _build_task_summary(row, attachments_by_owner)
+        latest_submission = latest_submission_by_task.get(int(row["id"]))
+        task = _build_task_summary(
+            row,
+            attachments_by_owner,
+            latest_submission,
+            reviews_by_submission,
+            submission_attachments_by_owner,
+        )
         task["supervisorLabel"] = handover_supervisors.get(task["handoverRecordId"], "")
         if status and task["status"] != status:
             continue
@@ -551,6 +561,11 @@ def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None =
                     task["mentionUserLabels"],
                     task["rejectReason"],
                     task["rejectedBy"],
+                    task["reviewStatusLabel"],
+                    task["reviewGrade"],
+                    _normalize_text(task.get("reviewAverageScore")),
+                    _normalize_text((task.get("reviewSubmission") or {}).get("content")),
+                    _normalize_text((task.get("reviewSubmission") or {}).get("reviewerLabels")),
                 ]
             ).lower()
             if keyword not in haystack:
@@ -647,6 +662,8 @@ def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
         raise ValueError("已完成任务不能领取")
     if status == "已驳回":
         raise ValueError("已驳回任务不能领取")
+    if status == "待审核":
+        raise ValueError("待审核任务不能领取")
     if not _is_actor_task_assignee(existing, actor_username):
         raise ValueError("只有任务负责人可以领取该任务")
 
@@ -685,6 +702,8 @@ def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any
         raise ValueError("已完成任务不能驳回")
     if _normalize_text(existing["status"]) == "已驳回":
         raise ValueError("已驳回任务不能重复驳回")
+    if _normalize_text(existing["status"]) == "待审核":
+        raise ValueError("待审核任务请通过评分审核")
     if not (_is_actor_task_assignee(existing, actor_username) or _actor_has_level5(actor_username)):
         raise ValueError("只有任务负责人或 5 级权限者可以驳回该任务")
 
@@ -711,13 +730,156 @@ def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any
     return item
 
 
+def submit_task_for_review(
+    task_id: int,
+    payload: dict[str, Any],
+    files,
+    actor_username: str,
+) -> dict[str, Any]:
+    existing = task_repository.fetch_task(task_id)
+    if not existing:
+        raise ValueError("任务不存在")
+    if _normalize_text(existing["status"]) != "进行中":
+        raise ValueError("只有进行中的任务可以提交审核")
+    if not _is_actor_task_assignee(existing, actor_username):
+        raise ValueError("只有任务负责人可以提交审核")
+
+    content = _normalize_text(payload.get("content"))
+    if not content:
+        raise ValueError("提交内容不能为空")
+
+    now = _now_text()
+    submission_id = task_repository.insert_task_submission(
+        {
+            "task_id": task_id,
+            "submitter_user": _normalize_text(actor_username),
+            "content": content,
+            "status": "pending",
+            "average_score": None,
+            "grade": "",
+            "submitted_at": now,
+            "reviewed_at": "",
+            "updated_at": now,
+        }
+    )
+    _store_attachments(files, "task_submission", submission_id, actor_username)
+    task_repository.update_task(
+        task_id,
+        {
+            "status": "待审核",
+            "updated_at": now,
+            "completed_at": None,
+            "reject_reason": "",
+            "rejected_by": "",
+            "rejected_at": "",
+        },
+    )
+    item = next(item for item in list_tasks({}) if item["id"] == task_id)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "修改",
+        f"提交审核 / {_task_operation_label(item)}",
+        item["id"],
+    )
+    return item
+
+
+def review_task_submission(task_id: int, payload: dict[str, Any], actor_username: str) -> dict[str, Any]:
+    existing = task_repository.fetch_task(task_id)
+    if not existing:
+        raise ValueError("任务不存在")
+    if _normalize_text(existing["status"]) != "待审核":
+        raise ValueError("只有待审核任务可以评分")
+
+    submission = task_repository.fetch_latest_task_submission(task_id)
+    if not submission or _normalize_text(submission["status"]) != "pending":
+        raise ValueError("当前任务没有待审核提交")
+
+    reviewer_username = _normalize_text(actor_username)
+    reviewers = _build_task_reviewers_from_row(existing)
+    reviewer_usernames = {item["username"] for item in reviewers if item.get("username")}
+    if reviewer_username not in reviewer_usernames:
+        raise ValueError("只有任务发布人和 @ 人员可以评分")
+
+    score = _normalize_score(payload.get("score"))
+    comment = _normalize_text(payload.get("comment"))
+    now = _now_text()
+    task_repository.upsert_task_review(
+        {
+            "submission_id": int(submission["id"]),
+            "task_id": task_id,
+            "reviewer_user": reviewer_username,
+            "score": score,
+            "comment": comment,
+            "reviewed_at": now,
+        }
+    )
+
+    reviews = task_repository.fetch_reviews_for_submission(int(submission["id"]))
+    review_scores = {
+        _normalize_text(row["reviewer_user"]): float(row["score"])
+        for row in reviews
+    }
+    required_scores = [
+        review_scores[item["username"]]
+        for item in reviewers
+        if item.get("username") in review_scores
+    ]
+    if len(required_scores) >= len(reviewers):
+        average_score = round(sum(required_scores) / len(required_scores), 2)
+        grade = _get_review_grade(average_score)
+        passed = average_score >= 60
+        task_repository.update_task_submission(
+            int(submission["id"]),
+            {
+                "status": "passed" if passed else "failed",
+                "average_score": average_score,
+                "grade": grade,
+                "reviewed_at": now,
+                "updated_at": now,
+            },
+        )
+        task_repository.update_task(
+            task_id,
+            {
+                "status": "已完成" if passed else "进行中",
+                "updated_at": now,
+                "completed_at": now if passed else None,
+            },
+        )
+    else:
+        task_repository.update_task_submission(
+            int(submission["id"]),
+            {
+                "updated_at": now,
+            },
+        )
+
+    item = next(item for item in list_tasks({}) if item["id"] == task_id)
+    _safe_record_operation(
+        actor_username,
+        "任务清单",
+        "修改",
+        f"审核评分 {score:g} / {_task_operation_label(item)}",
+        item["id"],
+    )
+    return item
+
+
 def delete_task(task_id: int, actor_username: str | None = None) -> None:
     existing = task_repository.fetch_task(task_id)
     if not existing:
         raise ValueError("任务不存在")
     if actor_username and not _can_actor_edit_task(existing, actor_username):
         raise ValueError("你没有权限删除该任务")
-    attachments = task_repository.fetch_attachments_for_owner("task", task_id)
+    attachments = list(task_repository.fetch_attachments_for_owner("task", task_id))
+    for submission in task_repository.fetch_all_task_submissions():
+        if int(submission["task_id"]) != int(task_id):
+            continue
+        attachments.extend(
+            task_repository.fetch_attachments_for_owner("task_submission", int(submission["id"]))
+        )
     task_repository.delete_task(task_id)
     _delete_attachment_files(attachments)
     _safe_record_operation(
@@ -747,7 +909,7 @@ def get_report_summary(
         "handoverCount": len(handovers),
         "taskCount": len(tasks),
         "completedTaskCount": tasks_by_status.get("已完成", 0),
-        "openTaskCount": tasks_by_status.get("未开始", 0) + tasks_by_status.get("进行中", 0),
+        "openTaskCount": tasks_by_status.get("未开始", 0) + tasks_by_status.get("进行中", 0) + tasks_by_status.get("待审核", 0),
         "tasksByStatus": tasks_by_status,
         "handoversByShift": handovers_by_shift,
     }
@@ -765,7 +927,7 @@ def get_reminders(
 
     due_tasks = []
     for task in tasks:
-        if task["status"] in {"已完成", "已驳回"}:
+        if task["status"] in {"待审核", "已完成", "已驳回"}:
             continue
         related_by_assignee = _is_user_related_to_values(
             user_values,
@@ -862,9 +1024,89 @@ def get_reminders(
             }
         )
 
+    review_notifications = []
+    for task in tasks:
+        submission = task.get("reviewSubmission") or {}
+        submission_id = submission.get("id")
+        submission_status = _normalize_text(submission.get("status"))
+        if not submission_id or not submission_status:
+            continue
+
+        related_by_assignee = _is_user_related_to_values(
+            user_values,
+            task.get("assigneeUserId") or task.get("assigneeUser"),
+        )
+        reviewer = next(
+            (
+                item
+                for item in submission.get("reviewers", [])
+                if _is_user_related_to_values(user_values, item.get("username") or item.get("label"))
+            ),
+            None,
+        )
+
+        if submission_status == "pending":
+            if related_by_assignee:
+                review_notifications.append(
+                    {
+                        "reminderId": f"task-review-pending:{submission_id}",
+                        "reminderType": "task",
+                        "reminderKind": "review-pending",
+                        "reminderTitle": "任务状态为待审核",
+                        "title": task["title"],
+                        "taskId": task["id"],
+                        "assigneeUser": task["assigneeUser"],
+                        "reviewStatusLabel": submission.get("statusLabel"),
+                        "reviewerLabels": submission.get("reviewerLabels"),
+                        "reminderTime": submission.get("submittedAt"),
+                        "description": f"任务 #{task['id']} 已提交审核，等待 {submission.get('reviewerLabels') or '审核人'} 评分。",
+                    }
+                )
+            if reviewer and not reviewer.get("hasReviewed"):
+                review_notifications.append(
+                    {
+                        "reminderId": f"task-review-needed:{submission_id}:{reviewer.get('username')}",
+                        "reminderType": "task",
+                        "reminderKind": "review-needed",
+                        "reminderTitle": "任务待审核评分",
+                        "title": task["title"],
+                        "taskId": task["id"],
+                        "assigneeUser": task["assigneeUser"],
+                        "reviewStatusLabel": submission.get("statusLabel"),
+                        "reviewerLabels": submission.get("reviewerLabels"),
+                        "reminderTime": submission.get("submittedAt"),
+                        "description": f"任务 #{task['id']} 由 {task['assigneeUser'] or '负责人'} 提交审核，请评分。",
+                    }
+                )
+            continue
+
+        if submission_status in {"passed", "failed"} and related_by_assignee:
+            passed = submission_status == "passed"
+            review_notifications.append(
+                {
+                    "reminderId": f"task-review-result:{submission_id}:{submission_status}",
+                    "reminderType": "task",
+                    "reminderKind": "review-result",
+                    "reminderTitle": "任务审核通过" if passed else "任务审核未通过",
+                    "title": task["title"],
+                    "taskId": task["id"],
+                    "assigneeUser": task["assigneeUser"],
+                    "reviewStatusLabel": submission.get("statusLabel"),
+                    "averageScore": submission.get("averageScore"),
+                    "grade": submission.get("grade"),
+                    "reminderTime": submission.get("reviewedAt") or submission.get("updatedAt") or submission.get("submittedAt"),
+                    "description": (
+                        f"平均分 {submission.get('averageScore')}，等级 {submission.get('grade') or '--'}。"
+                        if passed
+                        else f"平均分 {submission.get('averageScore')}，任务已退回进行中。"
+                    ),
+                }
+            )
+
     return {
         "dueTasks": due_tasks[:10],
         "shiftReminders": shift_reminders,
+        "reviewNotifications": review_notifications,
     }
 
 
@@ -1171,11 +1413,23 @@ def _build_handover_summary(
     }
 
 
-def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]]]):
+def _build_task_summary(
+    row,
+    attachments_by_owner: dict[int, list[dict[str, Any]]],
+    latest_submission=None,
+    reviews_by_submission: dict[int, list[Any]] | None = None,
+    submission_attachments_by_owner: dict[int, list[dict[str, Any]]] | None = None,
+):
     assignee_user = _build_person_reference(row["assignee_user"])
     creator_user = _build_person_reference(row["creator_user"])
     rejected_by = _build_person_reference(row["rejected_by"])
     mention_users = _parse_mention_users(row["mention_users"])
+    review_submission = _build_task_submission_summary(
+        latest_submission,
+        row,
+        reviews_by_submission or {},
+        submission_attachments_by_owner or {},
+    )
     return {
         "id": int(row["id"]),
         "title": _normalize_text(row["title"]),
@@ -1199,8 +1453,122 @@ def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]
         "rejectedByUserId": rejected_by["username"],
         "rejectedBy": rejected_by["label"],
         "rejectedAt": _normalize_text(row["rejected_at"]),
+        "reviewSubmission": review_submission,
+        "reviewStatusLabel": review_submission.get("statusLabel", "") if review_submission else "",
+        "reviewAverageScore": review_submission.get("averageScore") if review_submission else None,
+        "reviewGrade": review_submission.get("grade", "") if review_submission else "",
         "attachments": attachments_by_owner.get(int(row["id"]), []),
     }
+
+
+def _build_latest_task_submission_lookup():
+    lookup = {}
+    for row in task_repository.fetch_all_task_submissions():
+        task_id = int(row["task_id"])
+        if task_id not in lookup:
+            lookup[task_id] = row
+    return lookup
+
+
+def _build_task_review_lookup() -> dict[int, list[Any]]:
+    lookup: dict[int, list[Any]] = {}
+    for row in task_repository.fetch_all_task_reviews():
+        lookup.setdefault(int(row["submission_id"]), []).append(row)
+    return lookup
+
+
+def _build_task_submission_summary(
+    submission_row,
+    task_row,
+    reviews_by_submission: dict[int, list[Any]],
+    submission_attachments_by_owner: dict[int, list[dict[str, Any]]],
+) -> dict[str, Any] | None:
+    if not submission_row:
+        return None
+
+    submission_id = int(submission_row["id"])
+    review_rows = reviews_by_submission.get(submission_id, [])
+    review_map = {
+        _normalize_text(row["reviewer_user"]): row
+        for row in review_rows
+    }
+    reviewers = []
+    for reviewer in _build_task_reviewers_from_row(task_row):
+        reviewer_row = review_map.get(reviewer["username"])
+        reviewers.append(
+            {
+                "username": reviewer["username"],
+                "label": reviewer["label"],
+                "score": float(reviewer_row["score"]) if reviewer_row else None,
+                "comment": _normalize_text(reviewer_row["comment"]) if reviewer_row else "",
+                "reviewedAt": _normalize_text(reviewer_row["reviewed_at"]) if reviewer_row else "",
+                "hasReviewed": bool(reviewer_row),
+            }
+        )
+
+    status = _normalize_text(submission_row["status"]) or "pending"
+    average_score = submission_row["average_score"]
+    return {
+        "id": submission_id,
+        "taskId": int(submission_row["task_id"]),
+        "submitterUserId": _build_person_reference(submission_row["submitter_user"])["username"],
+        "submitterUser": _build_person_reference(submission_row["submitter_user"])["label"],
+        "content": _normalize_text(submission_row["content"]),
+        "status": status,
+        "statusLabel": _get_submission_status_label(status),
+        "averageScore": round(float(average_score), 2) if average_score is not None else None,
+        "grade": _normalize_text(submission_row["grade"]),
+        "submittedAt": _normalize_text(submission_row["submitted_at"]),
+        "reviewedAt": _normalize_text(submission_row["reviewed_at"]),
+        "updatedAt": _normalize_text(submission_row["updated_at"]),
+        "reviewers": reviewers,
+        "reviewerLabels": "、".join(item["label"] for item in reviewers if item.get("label")),
+        "attachments": submission_attachments_by_owner.get(submission_id, []),
+    }
+
+
+def _build_task_reviewers_from_row(task_row) -> list[dict[str, str]]:
+    raw_values = [_normalize_text(task_row["creator_user"])]
+    raw_values.extend(_parse_mention_users(task_row["mention_users"]))
+    reviewers: list[dict[str, str]] = []
+    seen_usernames: set[str] = set()
+    for value in raw_values:
+        username = _resolve_person_username(value)
+        if not username or username in seen_usernames:
+            continue
+        if not user_repository.fetch_user(username):
+            continue
+        reference = _build_person_reference(username)
+        seen_usernames.add(username)
+        reviewers.append(reference)
+    return reviewers
+
+
+def _get_submission_status_label(status: str) -> str:
+    normalized_status = _normalize_text(status)
+    if normalized_status == "passed":
+        return "审核通过"
+    if normalized_status == "failed":
+        return "审核未通过"
+    return "待审核"
+
+
+def _get_review_grade(average_score: float) -> str:
+    if average_score > 80:
+        return "优秀"
+    if average_score >= 60:
+        return "良"
+    return "不合格"
+
+
+def _normalize_score(value) -> float:
+    try:
+        score = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("评分必须是 0-100 的数字") from exc
+    if score < 0 or score > 100:
+        raise ValueError("评分必须在 0-100 之间")
+    return score
 
 
 def _normalize_text(value) -> str:

@@ -107,6 +107,36 @@ def ensure_task_tables() -> None:
         _ensure_column(connection, "TASK_ITEM", "rejected_at", "TEXT")
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS TASK_SUBMISSION (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                submitter_user TEXT NOT NULL,
+                content TEXT,
+                status TEXT NOT NULL,
+                average_score REAL,
+                grade TEXT,
+                submitted_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS TASK_REVIEW (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                submission_id INTEGER NOT NULL,
+                task_id INTEGER NOT NULL,
+                reviewer_user TEXT NOT NULL,
+                score REAL NOT NULL,
+                comment TEXT,
+                reviewed_at TEXT NOT NULL,
+                UNIQUE (submission_id, reviewer_user)
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS ATTACHMENT (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 owner_type TEXT NOT NULL,
@@ -144,6 +174,18 @@ def ensure_task_tables() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_task_status_due
             ON TASK_ITEM (status, due_at)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_task_submission_task
+            ON TASK_SUBMISSION (task_id, id DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_task_review_submission
+            ON TASK_REVIEW (submission_id, reviewer_user)
             """
         )
         connection.execute(
@@ -466,10 +508,11 @@ def fetch_all_tasks():
             ORDER BY
                 CASE status
                     WHEN '进行中' THEN 0
-                    WHEN '未开始' THEN 1
-                    WHEN '已完成' THEN 2
-                    WHEN '已驳回' THEN 3
-                    ELSE 4
+                    WHEN '待审核' THEN 1
+                    WHEN '未开始' THEN 2
+                    WHEN '已完成' THEN 3
+                    WHEN '已驳回' THEN 4
+                    ELSE 5
                 END,
                 due_at,
                 id DESC
@@ -535,6 +578,147 @@ def _ensure_column(connection, table_name: str, column_name: str, column_type: s
         connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
+def fetch_all_task_submissions():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM TASK_SUBMISSION
+            ORDER BY submitted_at DESC, id DESC
+            """
+        ).fetchall()
+
+
+def fetch_task_submission(submission_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            "SELECT * FROM TASK_SUBMISSION WHERE id = ?",
+            (submission_id,),
+        ).fetchone()
+
+
+def fetch_latest_task_submission(task_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM TASK_SUBMISSION
+            WHERE task_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (task_id,),
+        ).fetchone()
+
+
+def insert_task_submission(payload: dict) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO TASK_SUBMISSION (
+                task_id,
+                submitter_user,
+                content,
+                status,
+                average_score,
+                grade,
+                submitted_at,
+                reviewed_at,
+                updated_at
+            )
+            VALUES (
+                :task_id,
+                :submitter_user,
+                :content,
+                :status,
+                :average_score,
+                :grade,
+                :submitted_at,
+                :reviewed_at,
+                :updated_at
+            )
+            """,
+            payload,
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def update_task_submission(submission_id: int, payload: dict) -> None:
+    assignments = ", ".join(f"{field} = :{field}" for field in payload if field != "id")
+    with get_connection() as connection:
+        connection.execute(
+            f"UPDATE TASK_SUBMISSION SET {assignments} WHERE id = :id",
+            {"id": submission_id, **payload},
+        )
+        connection.commit()
+
+
+def fetch_reviews_for_submission(submission_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM TASK_REVIEW
+            WHERE submission_id = ?
+            ORDER BY reviewed_at DESC, id DESC
+            """,
+            (submission_id,),
+        ).fetchall()
+
+
+def fetch_all_task_reviews():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM TASK_REVIEW
+            ORDER BY reviewed_at DESC, id DESC
+            """
+        ).fetchall()
+
+
+def upsert_task_review(payload: dict) -> int:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO TASK_REVIEW (
+                submission_id,
+                task_id,
+                reviewer_user,
+                score,
+                comment,
+                reviewed_at
+            )
+            VALUES (
+                :submission_id,
+                :task_id,
+                :reviewer_user,
+                :score,
+                :comment,
+                :reviewed_at
+            )
+            ON CONFLICT(submission_id, reviewer_user) DO UPDATE SET
+                score = excluded.score,
+                comment = excluded.comment,
+                reviewed_at = excluded.reviewed_at
+            """,
+            payload,
+        )
+        connection.commit()
+        if cursor.lastrowid:
+            return int(cursor.lastrowid)
+        row = connection.execute(
+            """
+            SELECT id
+            FROM TASK_REVIEW
+            WHERE submission_id = ? AND reviewer_user = ?
+            """,
+            (payload["submission_id"], payload["reviewer_user"]),
+        ).fetchone()
+        return int(row["id"]) if row else 0
+
+
 def update_task(task_id: int, payload: dict) -> None:
     assignments = ", ".join(f"{field} = :{field}" for field in payload if field != "id")
     with get_connection() as connection:
@@ -555,6 +739,17 @@ def fetch_task(task_id: int):
 
 def delete_task(task_id: int) -> None:
     with get_connection() as connection:
+        submission_rows = connection.execute(
+            "SELECT id FROM TASK_SUBMISSION WHERE task_id = ?",
+            (task_id,),
+        ).fetchall()
+        for submission_row in submission_rows:
+            connection.execute(
+                "DELETE FROM ATTACHMENT WHERE owner_type = ? AND owner_id = ?",
+                ("task_submission", submission_row["id"]),
+            )
+        connection.execute("DELETE FROM TASK_REVIEW WHERE task_id = ?", (task_id,))
+        connection.execute("DELETE FROM TASK_SUBMISSION WHERE task_id = ?", (task_id,))
         connection.execute(
             "DELETE FROM ATTACHMENT WHERE owner_type = ? AND owner_id = ?",
             ("task", task_id),

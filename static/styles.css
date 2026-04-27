@@ -2350,6 +2350,12 @@ button:disabled {
   background: rgba(20, 184, 166, 0.2);
 }
 
+.task-color-box-review {
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.48);
+  background: rgba(245, 158, 11, 0.18);
+}
+
 .task-color-box-done,
 .task-color-box-low {
   color: #bbf7d0;

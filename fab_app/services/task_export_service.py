@@ -62,6 +62,9 @@ def _export_excel(export_type: str, rows: list[dict]) -> tuple[BytesIO, str, str
             ("rejectReason", "驳回理由"),
             ("rejectedBy", "驳回人"),
             ("rejectedAt", "驳回时间"),
+            ("reviewStatusLabel", "审核状态"),
+            ("reviewAverageScore", "审核均分"),
+            ("reviewGrade", "审核等级"),
             ("description", "任务说明"),
         ]
     else:

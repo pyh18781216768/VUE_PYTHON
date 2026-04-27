@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-06" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-07" />
   </head>
   <body>
     {% raw %}
@@ -564,6 +564,70 @@
                 </div>
               </teleport>
 
+              <teleport to="body">
+                <div v-if="taskSubmitDialogOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>提交任务审核</h2>
+                        <p>{{ taskSubmitForm.title || '请填写本次处理结果' }}</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closeTaskSubmitDialog">关闭</button>
+                    </div>
+                    <form class="task-form-grid" @submit.prevent="submitTaskReviewRequest">
+                      <label class="form-span-2">
+                        <span>提交内容</span>
+                        <textarea v-model.trim="taskSubmitForm.content" rows="6" placeholder="填写处理结果、现场情况、结论或需要审核人关注的内容"></textarea>
+                      </label>
+                      <label class="form-span-2">
+                        <span>回复附件</span>
+                        <input type="file" multiple @change="handleFileSelection('taskSubmit', $event)" />
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="closeTaskSubmitDialog">取消</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交审核' }}</button>
+                      </div>
+                    </form>
+                  </article>
+                </div>
+              </teleport>
+
+              <teleport to="body">
+                <div v-if="taskReviewDialogOpen" class="modal-layer">
+                  <div class="modal-backdrop" aria-hidden="true"></div>
+                  <article class="task-entry-dialog card task-form-card" @click.stop>
+                    <div class="section-head">
+                      <div>
+                        <h2>任务审核评分</h2>
+                        <p>{{ taskReviewForm.title || '请输入 0-100 分' }}</p>
+                      </div>
+                      <button class="btn-ghost" type="button" @click="closeTaskReviewDialog">关闭</button>
+                    </div>
+                    <form class="task-form-grid" @submit.prevent="submitTaskReviewScore">
+                      <label>
+                        <span>评分</span>
+                        <input v-model="taskReviewForm.score" type="number" min="0" max="100" step="1" placeholder="0-100" />
+                      </label>
+                      <label class="form-span-2">
+                        <span>评语</span>
+                        <textarea v-model.trim="taskReviewForm.comment" rows="5" placeholder="填写通过理由、扣分点或需要补充的事项"></textarea>
+                      </label>
+                      <p v-if="taskActionMessage" :class="['form-feedback form-span-2', taskActionTone === 'success' ? 'form-success' : 'form-error']">
+                        {{ taskActionMessage }}
+                      </p>
+                      <div class="profile-actions form-span-2">
+                        <button class="btn-secondary" type="button" @click="closeTaskReviewDialog">取消</button>
+                        <button class="btn-primary" type="submit" :disabled="taskActionSubmitting">{{ taskActionSubmitting ? '提交中...' : '提交评分' }}</button>
+                      </div>
+                    </form>
+                  </article>
+                </div>
+              </teleport>
+
               <article class="card task-table-card">
                 <div class="section-head">
                   <div>
@@ -648,6 +712,7 @@
                             <span>{{ getTaskSortIndicator('rejectReason') }}</span>
                           </button>
                         </th>
+                        <th>审核</th>
                         <th>附件</th>
                         <th>操作</th>
                       </tr>
@@ -676,6 +741,15 @@
                         <td>{{ item.supervisorLabel || '--' }}</td>
                         <td :title="item.mentionUserLabels">{{ item.mentionUserLabels || '--' }}</td>
                         <td :title="item.rejectReason">{{ item.rejectReason || '--' }}</td>
+                        <td :title="item.reviewSubmission?.reviewerLabels || ''">
+                          <span v-if="item.reviewSubmission" :class="['task-color-box', getTaskStatusBoxClass(item.status)]">
+                            {{ item.reviewSubmission.statusLabel }}
+                          </span>
+                          <small v-if="item.reviewSubmission && item.reviewSubmission.averageScore !== null">
+                            {{ item.reviewSubmission.averageScore }}分 / {{ item.reviewSubmission.grade || '--' }}
+                          </small>
+                          <span v-if="!item.reviewSubmission">--</span>
+                        </td>
                         <td @dblclick.stop>
                           <div v-for="file in item.attachments" :key="file.id" class="attachment-item">
                             <button
@@ -695,13 +769,15 @@
                         <td @dblclick.stop>
                           <div class="task-action-buttons">
                             <button v-if="canClaimTask(item)" class="btn-secondary table-action" type="button" @click="claimTask(item)">领取</button>
+                            <button v-if="canSubmitTask(item)" class="btn-secondary table-action" type="button" @click="openTaskSubmitDialog(item)">提交</button>
+                            <button v-if="canReviewTask(item)" class="btn-secondary table-action" type="button" @click="openTaskReviewDialog(item)">评分</button>
                             <button v-if="canRejectTask(item)" class="btn-ghost table-action" type="button" @click="openTaskRejectDialog(item)">驳回</button>
                             <button v-if="canEditTask(item)" class="btn-ghost table-action" type="button" @click="editTask(item)">编辑</button>
                           </div>
                         </td>
                       </tr>
                       <tr v-if="!filteredTaskItems.length">
-                        <td colspan="14" class="empty-cell">当前条件下没有任务数据</td>
+                        <td colspan="15" class="empty-cell">当前条件下没有任务数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1746,6 +1822,28 @@
                   </div>
                 </div>
               </section>
+
+              <section
+                v-if="detailDialogRecord.reviewSubmission && detailDialogRecord.reviewSubmission.attachments && detailDialogRecord.reviewSubmission.attachments.length"
+                class="detail-section"
+              >
+                <h3>提交附件</h3>
+                <div class="detail-attachment-list">
+                  <div v-for="file in detailDialogRecord.reviewSubmission.attachments" :key="file.id" class="attachment-item">
+                    <button
+                      v-if="isImageAttachment(file)"
+                      class="attachment-image-button"
+                      type="button"
+                      :title="`点击放大：${file.originalName}`"
+                      @click="openAttachmentPreview(file)"
+                    >
+                      <img :src="file.previewUrl || file.downloadUrl" :alt="file.originalName" />
+                    </button>
+                    <span v-else class="attachment-file-name">{{ file.originalName }}</span>
+                    <a :href="file.downloadUrl" class="attachment-download-link" download>下载</a>
+                  </div>
+                </div>
+              </section>
             </div>
           </section>
         </div>
@@ -1777,6 +1875,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-06"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-07"></script>
   </body>
 </html>

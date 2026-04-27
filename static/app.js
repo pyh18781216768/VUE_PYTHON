@@ -258,8 +258,9 @@
     reminders: {
       dueTasks: [],
       shiftReminders: [],
+      reviewNotifications: [],
     },
-    statusOptions: ["未开始", "进行中", "已完成"],
+    statusOptions: ["未开始", "进行中", "待审核", "已完成"],
     priorityOptions: ["低", "中", "高"],
   });
 
@@ -995,6 +996,17 @@
         title: "",
         reason: "",
       });
+      const taskSubmitForm = reactive({
+        taskId: "",
+        title: "",
+        content: "",
+      });
+      const taskReviewForm = reactive({
+        taskId: "",
+        title: "",
+        score: "",
+        comment: "",
+      });
       const userForm = reactive({
         username: "",
         displayName: "",
@@ -1029,12 +1041,15 @@
       });
       const handoverFiles = ref([]);
       const taskFiles = ref([]);
+      const taskSubmitFiles = ref([]);
       const taskActionSubmitting = ref(false);
       const taskActionMessage = ref("");
       const taskActionTone = ref("error");
       const handoverFormOpen = ref(false);
       const taskFormOpen = ref(false);
       const taskRejectDialogOpen = ref(false);
+      const taskSubmitDialogOpen = ref(false);
+      const taskReviewDialogOpen = ref(false);
       const attachmentPreviewOpen = ref(false);
       const attachmentPreviewFile = ref(null);
       const detailDialogOpen = ref(false);
@@ -1093,9 +1108,10 @@
         (taskSystem.value.statusOptions || []).map((item) => ({ value: item, label: item }))
       );
       const taskFormStatusSelectOptions = computed(() => {
-        const options = statusSelectOptions.value.filter((item) => item.value !== "已驳回");
-        if (taskForm.status === "已驳回") {
-          return [...options, { value: "已驳回", label: "已驳回" }];
+        const hiddenStatuses = new Set(["待审核", "已驳回"]);
+        const options = statusSelectOptions.value.filter((item) => !hiddenStatuses.has(item.value));
+        if (hiddenStatuses.has(taskForm.status)) {
+          return [...options, { value: taskForm.status, label: taskForm.status }];
         }
         return options;
       });
@@ -1313,7 +1329,25 @@
             unread: !notificationReadIds.value.has(id),
           };
         });
-        return [...shiftItems, ...taskItems]
+        const reviewItems = (taskSystem.value.reminders?.reviewNotifications || []).map((item) => {
+          const reminderTime = item.reminderTime || item.reviewedAt || item.submittedAt || "";
+          const id = item.reminderId || `task-review:${item.taskId}:${reminderTime}`;
+          return {
+            id,
+            type: "task",
+            typeLabel: item.reminderKind === "review-needed" ? "任务待评分" : "任务审核通知",
+            title: item.reminderTitle || item.title,
+            description: item.description || [
+              item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+              item.reviewStatusLabel ? `状态：${item.reviewStatusLabel}` : "",
+              item.grade ? `等级：${item.grade}` : "",
+            ].filter(Boolean).join(" / "),
+            time: reminderTime,
+            taskId: item.taskId,
+            unread: !notificationReadIds.value.has(id),
+          };
+        });
+        return [...shiftItems, ...taskItems, ...reviewItems]
           .filter((item) => !notificationClearedIds.value.has(item.id))
           .sort((left, right) => {
             if (left.unread !== right.unread) return left.unread ? -1 : 1;
@@ -2044,6 +2078,46 @@
         taskRejectDialogOpen.value = false;
       }
 
+      function resetTaskSubmitForm() {
+        taskSubmitForm.taskId = "";
+        taskSubmitForm.title = "";
+        taskSubmitForm.content = "";
+        taskSubmitFiles.value = [];
+      }
+
+      function openTaskSubmitDialog(item) {
+        resetTaskSubmitForm();
+        setTaskActionMessage("", "error");
+        taskSubmitForm.taskId = String(item.id || "");
+        taskSubmitForm.title = item.title || "";
+        taskSubmitDialogOpen.value = true;
+      }
+
+      function closeTaskSubmitDialog() {
+        resetTaskSubmitForm();
+        taskSubmitDialogOpen.value = false;
+      }
+
+      function resetTaskReviewForm() {
+        taskReviewForm.taskId = "";
+        taskReviewForm.title = "";
+        taskReviewForm.score = "";
+        taskReviewForm.comment = "";
+      }
+
+      function openTaskReviewDialog(item) {
+        resetTaskReviewForm();
+        setTaskActionMessage("", "error");
+        taskReviewForm.taskId = String(item.id || "");
+        taskReviewForm.title = item.title || "";
+        taskReviewDialogOpen.value = true;
+      }
+
+      function closeTaskReviewDialog() {
+        resetTaskReviewForm();
+        taskReviewDialogOpen.value = false;
+      }
+
       function resetUserForm() {
         userForm.username = "";
         userForm.displayName = "";
@@ -2094,6 +2168,7 @@
       function getTaskStatusBoxClass(status) {
         if (status === "已驳回") return "task-color-box-rejected";
         if (status === "已完成") return "task-color-box-done";
+        if (status === "待审核") return "task-color-box-review";
         if (status === "进行中") return "task-color-box-active";
         return "task-color-box-pending";
       }
@@ -2109,7 +2184,19 @@
       }
 
       function canRejectTask(item) {
-        return !["已完成", "已驳回"].includes(item.status) && (isCurrentUserTaskAssignee(item) || isAdmin.value);
+        return !["待审核", "已完成", "已驳回"].includes(item.status) && (isCurrentUserTaskAssignee(item) || isAdmin.value);
+      }
+
+      function canSubmitTask(item) {
+        return item.status === "进行中" && isCurrentUserTaskAssignee(item);
+      }
+
+      function canReviewTask(item) {
+        const submission = item.reviewSubmission || {};
+        if (item.status !== "待审核" || submission.status !== "pending") return false;
+        return (submission.reviewers || []).some((reviewer) =>
+          !reviewer.hasReviewed && isCurrentUserIdentity(reviewer.username || reviewer.label)
+        );
       }
 
       function canEditTask(item) {
@@ -2664,6 +2751,10 @@
         }
         if (targetName === "task") {
           taskFiles.value = files;
+          return;
+        }
+        if (targetName === "taskSubmit") {
+          taskSubmitFiles.value = files;
         }
       }
 
@@ -2842,7 +2933,7 @@
       }
 
       function buildTaskDetailSections(record) {
-        return [
+        const sections = [
           {
             title: "基础信息",
             fields: [
@@ -2877,6 +2968,32 @@
             ],
           },
         ];
+        const submission = record.reviewSubmission;
+        if (submission) {
+          sections.push({
+            title: "提交审核",
+            fields: [
+              { label: "提交人", value: detailValue(submission.submitterUser) },
+              { label: "提交时间", value: formatDateTime(submission.submittedAt) },
+              { label: "审核状态", value: detailValue(submission.statusLabel) },
+              { label: "审核人", value: detailValue(submission.reviewerLabels), long: true },
+              { label: "平均分", value: detailValue(submission.averageScore) },
+              { label: "等级", value: detailValue(submission.grade) },
+              { label: "审核完成时间", value: formatDateTime(submission.reviewedAt) },
+              { label: "提交内容", value: detailValue(submission.content), long: true },
+              {
+                label: "评分明细",
+                value: detailValue((submission.reviewers || []).map((reviewer) => {
+                  const scoreText = reviewer.hasReviewed ? `${reviewer.score}分` : "未评分";
+                  const commentText = reviewer.comment ? `：${reviewer.comment}` : "";
+                  return `${reviewer.label || reviewer.username} ${scoreText}${commentText}`;
+                })),
+                long: true,
+              },
+            ],
+          });
+        }
+        return sections;
       }
 
       function buildUserDetailSections(record) {
@@ -3219,6 +3336,70 @@
         }
       }
 
+      async function submitTaskReviewRequest() {
+        if (!isTaskFormIdle()) return;
+        const taskId = Number(taskSubmitForm.taskId);
+        const content = taskSubmitForm.content.trim();
+        if (!taskId) return;
+        if (!content) {
+          setTaskActionMessage("请输入提交内容。", "error");
+          return;
+        }
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestFormData(
+            `/api/task-system/tasks/${taskId}/submit`,
+            { content },
+            taskSubmitFiles.value
+          );
+          upsertTaskSystemItem("tasks", responsePayload.item);
+          closeTaskSubmitDialog();
+          setTaskActionMessage("任务已提交审核。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
+      async function submitTaskReviewScore() {
+        if (!isTaskFormIdle()) return;
+        const taskId = Number(taskReviewForm.taskId);
+        const score = Number(taskReviewForm.score);
+        if (!taskId) return;
+        if (!Number.isFinite(score) || score < 0 || score > 100) {
+          setTaskActionMessage("评分必须在 0-100 之间。", "error");
+          return;
+        }
+        taskActionSubmitting.value = true;
+        setTaskActionMessage("", "error");
+        try {
+          const responsePayload = await requestJson(`/api/task-system/tasks/${taskId}/review`, {
+            method: "POST",
+            body: JSON.stringify({
+              score,
+              comment: taskReviewForm.comment,
+            }),
+          });
+          upsertTaskSystemItem("tasks", responsePayload.item);
+          closeTaskReviewDialog();
+          setTaskActionMessage("评分已提交。");
+          void fetchTaskSystem({ showLoading: false, resetForms: false });
+        } catch (errorInstance) {
+          setTaskActionMessage(
+            errorInstance instanceof Error ? errorInstance.message : String(errorInstance),
+            "error"
+          );
+        } finally {
+          taskActionSubmitting.value = false;
+        }
+      }
+
       function deleteCurrentHandover() {
         if (!handoverForm.id) return;
         void deleteHandover({ id: handoverForm.id });
@@ -3464,6 +3645,8 @@
           if (resetForms) {
             resetHandoverForm();
             resetTaskForm();
+            resetTaskSubmitForm();
+            resetTaskReviewForm();
             resetUserForm();
             resetShiftForm();
           }
@@ -4325,6 +4508,8 @@
         handoverForm,
         taskForm,
         taskRejectForm,
+        taskSubmitForm,
+        taskReviewForm,
         userForm,
         permissionForm,
         shiftForm,
@@ -4332,12 +4517,15 @@
         departmentForm,
         handoverFiles,
         taskFiles,
+        taskSubmitFiles,
         taskActionSubmitting,
         taskActionMessage,
         taskActionTone,
         handoverFormOpen,
         taskFormOpen,
         taskRejectDialogOpen,
+        taskSubmitDialogOpen,
+        taskReviewDialogOpen,
         userFormOpen,
         permissionFormOpen,
         shiftFormOpen,
@@ -4425,6 +4613,8 @@
         getTaskPriorityBoxClass,
         canClaimTask,
         canRejectTask,
+        canSubmitTask,
+        canReviewTask,
         canEditTask,
         isImageAttachment,
         openAttachmentPreview,
@@ -4472,6 +4662,12 @@
         openTaskRejectDialog,
         closeTaskRejectDialog,
         submitTaskReject,
+        openTaskSubmitDialog,
+        closeTaskSubmitDialog,
+        submitTaskReviewRequest,
+        openTaskReviewDialog,
+        closeTaskReviewDialog,
+        submitTaskReviewScore,
         deleteHandover,
         deleteTask,
         deleteCurrentHandover,
