@@ -1074,7 +1074,12 @@
         departmentOptions.value.map((item) => ({ value: item.name, label: item.name }))
       );
       const userSelectOptions = computed(() =>
-        taskUsers.value.map((item) => ({ value: item.displayLabel, label: item.displayLabel }))
+        taskUsers.value.map((item) => ({
+          value: item.username,
+          label: item.displayLabel && item.displayLabel !== item.username
+            ? `${item.displayLabel} / ${item.username}`
+            : item.username,
+        }))
       );
       const mentionUserSelectOptions = computed(() =>
         taskUsers.value.map((item) => ({
@@ -1145,8 +1150,14 @@
           ) {
             return false;
           }
-          if (handoverFilters.handoverUser && item.handoverUser !== handoverFilters.handoverUser) return false;
-          if (handoverFilters.receiverUser && item.receiverUser !== handoverFilters.receiverUser) return false;
+          if (
+            handoverFilters.handoverUser &&
+            !matchesPersonValue(item.handoverUserId || item.handoverUser, handoverFilters.handoverUser)
+          ) return false;
+          if (
+            handoverFilters.receiverUser &&
+            !matchesPersonValue(item.receiverUserId || item.receiverUser, handoverFilters.receiverUser)
+          ) return false;
           if (handoverFilters.keyword) {
             const haystack = [
               item.title,
@@ -1173,7 +1184,10 @@
       const filteredTaskItems = computed(() => {
         const rows = (taskSystem.value.tasks || []).filter((item) => {
           if (taskFilters.status && item.status !== taskFilters.status) return false;
-          if (taskFilters.assigneeUser && item.assigneeUser !== taskFilters.assigneeUser) return false;
+          if (
+            taskFilters.assigneeUser &&
+            !matchesPersonValue(item.assigneeUserId || item.assigneeUser, taskFilters.assigneeUser)
+          ) return false;
           if (taskFilters.keyword) {
             const haystack = [
               item.title,
@@ -1280,18 +1294,21 @@
           };
         });
         const taskItems = (taskSystem.value.reminders?.dueTasks || []).map((item) => {
-          const id = item.reminderId || `task:${item.id}:${item.startAt}`;
+          const reminderTime = item.reminderTime || item.startAt || item.dueAt;
+          const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期时间" : "开始时间");
+          const remainingText = formatReminderRemaining(item);
+          const id = item.reminderId || `task:${item.id}:${reminderTime}`;
           return {
             id,
             type: "task",
-            typeLabel: "任务提醒",
+            typeLabel: item.reminderKind === "due" ? "任务到期提醒" : "任务提醒",
             title: item.reminderTitle || item.title,
             description: [
               item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
-              `开始时间：${formatDateTime(item.startAt)}`,
-              `剩余 ${formatReminderRemaining(item)}`,
+              `${timeLabel}：${formatDateTime(reminderTime)}`,
+              remainingText === "已到期" ? "已到期" : `剩余 ${remainingText}`,
             ].filter(Boolean).join(" / "),
-            time: item.startAt,
+            time: reminderTime,
             taskId: item.id,
             unread: !notificationReadIds.value.has(id),
           };
@@ -1964,7 +1981,7 @@
         handoverForm.shiftGroupId = String(taskSystem.value.currentUser?.shiftGroupId || "");
         handoverForm.floorId = "";
         handoverForm.recordTime = new Date().toISOString().slice(0, 16);
-        handoverForm.handoverUser = authUser.value.displayLabel || authUser.value.username || "";
+        handoverForm.handoverUser = authUser.value.username || "";
         handoverForm.receiverUser = "";
         handoverForm.workSummary = "";
         handoverForm.precautions = "";
@@ -2099,23 +2116,60 @@
         if (isAdmin.value) return true;
         const currentUsername = authUser.value.username || "";
         if (!currentUsername) return false;
-        if (isCurrentUserIdentity(item.creatorUser)) return true;
-        const creator = taskUsers.value.find((user) =>
-          [user.username, user.displayName, user.displayLabel].includes(item.creatorUser)
-        );
+        if (isCurrentUserIdentity(item.creatorUserId || item.creatorUser)) return true;
+        const creator = findUserByIdentity(item.creatorUserId || item.creatorUser);
         return creator?.supervisorUser === currentUsername;
       }
 
       function isCurrentUserTaskAssignee(item) {
-        return isCurrentUserIdentity(item.assigneeUser);
+        return isCurrentUserIdentity(item.assigneeUserId || item.assigneeUser);
       }
 
       function isCurrentUserIdentity(value) {
+        const currentValues = new Set(
+          [authUser.value.username, authUser.value.displayName, authUser.value.displayLabel]
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+        );
+        for (const valueItem of getPersonIdentityValues(value)) {
+          if (currentValues.has(valueItem)) return true;
+        }
+        return false;
+      }
+
+      function findUserByIdentity(value) {
         const normalizedValue = String(value || "").trim();
-        if (!normalizedValue) return false;
-        return [authUser.value.username, authUser.value.displayName, authUser.value.displayLabel]
-          .filter(Boolean)
-          .includes(normalizedValue);
+        if (!normalizedValue) return null;
+        return taskUsers.value.find((user) =>
+          [user.username, user.displayName, user.displayLabel]
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+            .includes(normalizedValue)
+        ) || null;
+      }
+
+      function getPersonIdentityValues(value) {
+        const normalizedValue = String(value || "").trim();
+        const values = new Set();
+        if (normalizedValue) values.add(normalizedValue);
+        const user = findUserByIdentity(normalizedValue);
+        if (user) {
+          [user.username, user.displayName, user.displayLabel]
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+            .forEach((item) => values.add(item));
+        }
+        return values;
+      }
+
+      function matchesPersonValue(recordValue, selectedValue) {
+        if (!String(selectedValue || "").trim()) return true;
+        const recordValues = getPersonIdentityValues(recordValue);
+        const selectedValues = getPersonIdentityValues(selectedValue);
+        for (const valueItem of selectedValues) {
+          if (recordValues.has(valueItem)) return true;
+        }
+        return false;
       }
 
       function isImageAttachment(file) {
@@ -2525,7 +2579,9 @@
 
       function formatReminderRemaining(item) {
         if (item?.remainingText) return item.remainingText;
-        const minutesUntil = Math.max(0, Number(item?.minutesUntil || 0));
+        const rawMinutesUntil = Number(item?.minutesUntil || 0);
+        if (rawMinutesUntil < 0) return "已到期";
+        const minutesUntil = Math.max(0, rawMinutesUntil);
         const totalHours = minutesUntil ? Math.ceil(minutesUntil / 60) : 0;
         const days = Math.floor(totalHours / 24);
         const hours = totalHours % 24;
@@ -2617,8 +2673,8 @@
         handoverForm.shiftGroupId = String(record.shiftGroupId || "");
         handoverForm.floorId = String(record.floorId || "");
         handoverForm.recordTime = (record.recordTime || "").replace(" ", "T").slice(0, 16);
-        handoverForm.handoverUser = record.handoverUser;
-        handoverForm.receiverUser = record.receiverUser;
+        handoverForm.handoverUser = record.handoverUserId || record.handoverUser;
+        handoverForm.receiverUser = record.receiverUserId || record.receiverUser;
         handoverForm.workSummary = record.workSummary;
         handoverForm.precautions = record.precautions;
         handoverForm.pendingItems = record.pendingItems;
@@ -2637,7 +2693,7 @@
         taskForm.priority = item.priority || "中";
         taskForm.startAt = (item.startAt || "").replace(" ", "T").slice(0, 16);
         taskForm.dueAt = (item.dueAt || "").replace(" ", "T").slice(0, 16);
-        taskForm.assigneeUser = item.assigneeUser;
+        taskForm.assigneeUser = item.assigneeUserId || item.assigneeUser;
         taskForm.handoverRecordId = String(item.handoverRecordId || "");
         taskForm.mentionUsers = Array.isArray(item.mentionUsers) ? [...item.mentionUsers] : [];
         taskFiles.value = [];
@@ -3243,6 +3299,12 @@
       }
 
       // === Export and data loading helpers ===
+      function getTaskExportFilters(type) {
+        if (type === "handover") return handoverFilters;
+        if (type === "operation") return operationFilters;
+        return taskFilters;
+      }
+
       async function downloadTaskExport(type, format) {
         taskActionSubmitting.value = true;
         setTaskActionMessage("", "error");
@@ -3254,7 +3316,7 @@
             body: JSON.stringify({
               type,
               format,
-              filters: type === "handover" ? handoverFilters : taskFilters,
+              filters: getTaskExportFilters(type),
             }),
           });
           if (response.status === 401) {

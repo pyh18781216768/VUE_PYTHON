@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fab Directory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-02" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=20260427-06" />
   </head>
   <body>
     {% raw %}
-    <div id="app" :class="['page-shell', { 'page-shell-auth': !isAuthenticated }]">
+    <div id="app" v-cloak :class="['page-shell', { 'page-shell-auth': !isAuthenticated }]">
       <div v-if="authChecking" class="state-panel">
         <div class="spinner"></div>
         <p>正在检查登录状态...</p>
@@ -917,7 +917,10 @@
                   <h2>操作记录查询</h2>
                   <p>记录任务系统内增加、修改、删除、查看四类操作，支持按人、时间段和操作功能筛选。</p>
                 </div>
-                <button class="btn-secondary" type="button" @click="resetOperationSort">重置排序</button>
+                <div class="button-row">
+                  <button class="btn-secondary" type="button" @click="resetOperationSort">重置排序</button>
+                  <button class="btn-secondary" type="button" @click="downloadTaskExport('operation', 'excel')">导出 Excel</button>
+                </div>
               </div>
               <div class="task-filter-grid">
                 <label>
@@ -1774,6 +1777,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-02"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-06"></script>
   </body>
 </html>

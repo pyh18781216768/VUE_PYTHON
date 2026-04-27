@@ -49,6 +49,7 @@ def ensure_task_system_store() -> None:
     _seed_shift_groups()
     _seed_departments()
     _seed_settings()
+    _migrate_person_fields_to_usernames()
 
 
 def get_task_system_payload(username: str) -> dict[str, Any]:
@@ -415,9 +416,9 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         if shift_group_id and record["shiftGroupId"] != shift_group_id:
             continue
-        if handover_user and record["handoverUser"] != handover_user:
+        if handover_user and not _matches_person_filter(record.get("handoverUserId") or record["handoverUser"], handover_user):
             continue
-        if receiver_user and record["receiverUser"] != receiver_user:
+        if receiver_user and not _matches_person_filter(record.get("receiverUserId") or record["receiverUser"], receiver_user):
             continue
         if keyword:
             haystack = " ".join(
@@ -448,13 +449,12 @@ def save_handover_record(
     actor_username: str,
 ) -> dict[str, Any]:
     now = _now_text()
-    actor_profile = get_user_summary(actor_username)
     record_payload = {
         "title": _normalize_text(payload.get("title")) or "交接班记录",
         "shift_group_id": _safe_int(payload.get("shiftGroupId")),
         "floor_id": _safe_int(payload.get("floorId")),
-        "handover_user": _resolve_person_name(payload.get("handoverUser")) or actor_profile["displayLabel"],
-        "receiver_user": _resolve_person_name(payload.get("receiverUser")),
+        "handover_user": _resolve_person_username(payload.get("handoverUser")) or _normalize_text(actor_username),
+        "receiver_user": _resolve_person_username(payload.get("receiverUser")),
         "work_summary": _normalize_text(payload.get("workSummary")),
         "precautions": _normalize_text(payload.get("precautions")),
         "pending_items": _normalize_text(payload.get("pendingItems")),
@@ -534,7 +534,7 @@ def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None =
         task["supervisorLabel"] = handover_supervisors.get(task["handoverRecordId"], "")
         if status and task["status"] != status:
             continue
-        if assignee_user and task["assigneeUser"] != assignee_user:
+        if assignee_user and not _matches_person_filter(task.get("assigneeUserId") or task["assigneeUser"], assignee_user):
             continue
         if handover_record_id and task["handoverRecordId"] != handover_record_id:
             continue
@@ -579,14 +579,14 @@ def save_task(payload: dict[str, Any], files, actor_username: str) -> dict[str, 
         "priority": priority,
         "start_at": start_at,
         "due_at": due_at,
-        "assignee_user": _resolve_person_name(payload.get("assigneeUser")),
+        "assignee_user": _resolve_person_username(payload.get("assigneeUser")),
         "mention_users": _serialize_mention_users(payload.get("mentionUsers")),
         "handover_record_id": _safe_int(payload.get("handoverRecordId")),
         "reminder_at": None,
         "updated_at": now,
         "completed_at": now if status == "已完成" else None,
         "reject_reason": _normalize_text(payload.get("rejectReason")) if status == "已驳回" else "",
-        "rejected_by": _normalize_text(payload.get("rejectedBy")) if status == "已驳回" else "",
+        "rejected_by": _resolve_person_username(payload.get("rejectedBy")) if status == "已驳回" else "",
         "rejected_at": _normalize_datetime_text(payload.get("rejectedAt")) if status == "已驳回" else "",
     }
     if not task_payload["title"]:
@@ -651,11 +651,10 @@ def claim_task(task_id: int, actor_username: str) -> dict[str, Any]:
         raise ValueError("只有任务负责人可以领取该任务")
 
     now = _now_text()
-    actor_profile = get_user_summary(actor_username)
     task_repository.update_task(
         task_id,
         {
-            "assignee_user": actor_profile["displayLabel"],
+            "assignee_user": _normalize_text(actor_username),
             "status": "进行中",
             "updated_at": now,
             "completed_at": None,
@@ -690,13 +689,12 @@ def reject_task(task_id: int, reason: str, actor_username: str) -> dict[str, Any
         raise ValueError("只有任务负责人或 5 级权限者可以驳回该任务")
 
     now = _now_text()
-    actor_profile = get_user_summary(actor_username)
     task_repository.update_task(
         task_id,
         {
             "status": "已驳回",
             "reject_reason": reject_reason,
-            "rejected_by": actor_profile["displayLabel"],
+            "rejected_by": _normalize_text(actor_username),
             "rejected_at": now,
             "updated_at": now,
             "completed_at": None,
@@ -767,10 +765,12 @@ def get_reminders(
 
     due_tasks = []
     for task in tasks:
-        if task["status"] in {"已完成", "已驳回"} or not task["startAt"]:
+        if task["status"] in {"已完成", "已驳回"}:
             continue
-        start_at = _parse_datetime(task["startAt"])
-        related_by_assignee = _is_user_related_to_values(user_values, task.get("assigneeUser"))
+        related_by_assignee = _is_user_related_to_values(
+            user_values,
+            task.get("assigneeUserId") or task.get("assigneeUser"),
+        )
         related_by_mention = _is_user_related_to_any(user_values, task.get("mentionUsers"))
         related_by_text_mention = _is_user_mentioned(
             user_values,
@@ -779,16 +779,42 @@ def get_reminders(
         )
         if not (related_by_assignee or related_by_mention or related_by_text_mention):
             continue
+
+        if task["status"] == "进行中":
+            if not task["dueAt"]:
+                continue
+            due_at = _parse_datetime(task["dueAt"])
+            minutes_until = int((due_at - now).total_seconds() // 60)
+            due_tasks.append(
+                {
+                    **task,
+                    "reminderId": f"task-due:{task['id']}:{task['dueAt']}",
+                    "reminderType": "task",
+                    "reminderKind": "due",
+                    "reminderTitle": f"{task['title']} 到期提醒",
+                    "reminderTime": task["dueAt"],
+                    "timeLabel": "到期时间",
+                    "minutesUntil": minutes_until,
+                    "remainingText": _format_remaining_text(minutes_until),
+                }
+            )
+            continue
+
+        if not task["startAt"]:
+            continue
+        start_at = _parse_datetime(task["startAt"])
         if start_at < now:
             continue
         minutes_until = int((start_at - now).total_seconds() // 60)
         due_tasks.append(
             {
                 **task,
-                "reminderId": f"task:{task['id']}:{task['startAt']}",
+                "reminderId": f"task-start:{task['id']}:{task['startAt']}",
                 "reminderType": "task",
+                "reminderKind": "start",
                 "reminderTitle": task["title"],
                 "reminderTime": task["startAt"],
+                "timeLabel": "开始时间",
                 "minutesUntil": minutes_until,
                 "remainingText": _format_remaining_text(minutes_until),
             }
@@ -797,7 +823,10 @@ def get_reminders(
     shift_reminders = []
     shifts_by_id = {item["id"]: item for item in list_shift_groups()}
     for record in handovers:
-        related_by_receiver = _is_user_related_to_values(user_values, record.get("receiverUser"))
+        related_by_receiver = _is_user_related_to_values(
+            user_values,
+            record.get("receiverUserId") or record.get("receiverUser"),
+        )
         related_by_mention = _is_user_related_to_any(user_values, record.get("mentionUsers"))
         related_by_text_mention = _is_user_mentioned(
             user_values,
@@ -979,10 +1008,11 @@ def _safe_record_operation(
 
 
 def _build_operation_log_summary(row) -> dict[str, Any]:
+    operator_user = _build_person_reference(row["operator_user"] or row["operator_label"])
     return {
         "id": int(row["id"]),
-        "operatorUser": _normalize_text(row["operator_user"]),
-        "operatorLabel": _normalize_text(row["operator_label"]),
+        "operatorUser": operator_user["username"],
+        "operatorLabel": operator_user["label"] or _normalize_text(row["operator_label"]),
         "operatedAt": _normalize_text(row["operated_at"]),
         "pageName": _normalize_text(row["page_name"]),
         "actionType": _normalize_text(row["action_type"]),
@@ -1106,7 +1136,10 @@ def _build_handover_summary(
     shift = shifts_by_id.get(shift_group_id, {})
     receiver_shift = _get_next_shift(shift_group_id, shifts)
     floor = floors_by_id.get(floor_id, {})
-    supervisor = _get_supervisor_for_person(row["receiver_user"])
+    handover_user = _build_person_reference(row["handover_user"])
+    receiver_user = _build_person_reference(row["receiver_user"])
+    created_by = _build_person_reference(row["created_by"])
+    supervisor = _get_supervisor_for_person(receiver_user["username"] or row["receiver_user"])
     mention_users = _parse_mention_users(row["mention_users"])
     return {
         "id": int(row["id"]),
@@ -1118,8 +1151,10 @@ def _build_handover_summary(
         "floorId": floor_id,
         "floorName": _normalize_text(floor.get("name")) or "--",
         "recordTime": _normalize_text(row["record_time"]),
-        "handoverUser": _normalize_text(row["handover_user"]),
-        "receiverUser": _normalize_text(row["receiver_user"]),
+        "handoverUserId": handover_user["username"],
+        "handoverUser": handover_user["label"],
+        "receiverUserId": receiver_user["username"],
+        "receiverUser": receiver_user["label"],
         "receiverSupervisorUser": supervisor["username"],
         "receiverSupervisorLabel": supervisor["label"],
         "workSummary": _normalize_text(row["work_summary"]),
@@ -1128,7 +1163,8 @@ def _build_handover_summary(
         "keywords": _normalize_text(row["keywords"]),
         "mentionUsers": mention_users,
         "mentionUserLabels": _format_mention_user_labels(mention_users),
-        "createdBy": _normalize_text(row["created_by"]),
+        "createdById": created_by["username"],
+        "createdBy": created_by["label"],
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "attachments": attachments_by_owner.get(int(row["id"]), []),
@@ -1136,6 +1172,9 @@ def _build_handover_summary(
 
 
 def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]]]):
+    assignee_user = _build_person_reference(row["assignee_user"])
+    creator_user = _build_person_reference(row["creator_user"])
+    rejected_by = _build_person_reference(row["rejected_by"])
     mention_users = _parse_mention_users(row["mention_users"])
     return {
         "id": int(row["id"]),
@@ -1145,17 +1184,20 @@ def _build_task_summary(row, attachments_by_owner: dict[int, list[dict[str, Any]
         "priority": _normalize_text(row["priority"]),
         "startAt": _normalize_text(row["start_at"]),
         "dueAt": _normalize_text(row["due_at"]),
-        "assigneeUser": _normalize_text(row["assignee_user"]),
+        "assigneeUserId": assignee_user["username"],
+        "assigneeUser": assignee_user["label"],
         "mentionUsers": mention_users,
         "mentionUserLabels": _format_mention_user_labels(mention_users),
-        "creatorUser": _normalize_text(row["creator_user"]),
+        "creatorUserId": creator_user["username"],
+        "creatorUser": creator_user["label"],
         "handoverRecordId": _safe_int(row["handover_record_id"]),
         "supervisorLabel": "",
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "completedAt": _normalize_text(row["completed_at"]),
         "rejectReason": _normalize_text(row["reject_reason"]),
-        "rejectedBy": _normalize_text(row["rejected_by"]),
+        "rejectedByUserId": rejected_by["username"],
+        "rejectedBy": rejected_by["label"],
         "rejectedAt": _normalize_text(row["rejected_at"]),
         "attachments": attachments_by_owner.get(int(row["id"]), []),
     }
@@ -1226,6 +1268,80 @@ def _find_user_row_by_identity(value):
         if normalized_value in {username, display_name}:
             return row
     return None
+
+
+def _resolve_person_username(value) -> str:
+    normalized_value = _normalize_text(value)
+    if not normalized_value:
+        return ""
+    user_row = _find_user_row_by_identity(normalized_value)
+    if user_row:
+        return _normalize_text(user_row["user"])
+    return normalized_value
+
+
+def _build_person_reference(value) -> dict[str, str]:
+    normalized_value = _normalize_text(value)
+    if not normalized_value:
+        return {"username": "", "label": ""}
+    user_row = _find_user_row_by_identity(normalized_value)
+    if user_row:
+        username = _normalize_text(user_row["user"])
+        label = _normalize_text(user_row["display_name"]) or username
+        return {"username": username, "label": label}
+    return {"username": normalized_value, "label": normalized_value}
+
+
+def _matches_person_filter(identity_value, filter_value) -> bool:
+    normalized_filter = _normalize_text(filter_value)
+    if not normalized_filter:
+        return True
+
+    identity_reference = _build_person_reference(identity_value)
+    filter_reference = _build_person_reference(normalized_filter)
+    identity_values = {
+        _normalize_text(identity_value),
+        identity_reference["username"],
+        identity_reference["label"],
+    }
+    filter_values = {
+        normalized_filter,
+        filter_reference["username"],
+        filter_reference["label"],
+    }
+    identity_values.discard("")
+    filter_values.discard("")
+    return bool(identity_values & filter_values)
+
+
+def _migrate_person_fields_to_usernames() -> None:
+    for row in task_repository.fetch_all_handover_records():
+        payload: dict[str, str] = {}
+        handover_username = _resolve_person_username(row["handover_user"])
+        receiver_username = _resolve_person_username(row["receiver_user"])
+        created_by_username = _resolve_person_username(row["created_by"])
+        if handover_username and handover_username != _normalize_text(row["handover_user"]) and user_repository.fetch_user(handover_username):
+            payload["handover_user"] = handover_username
+        if receiver_username and receiver_username != _normalize_text(row["receiver_user"]) and user_repository.fetch_user(receiver_username):
+            payload["receiver_user"] = receiver_username
+        if created_by_username and created_by_username != _normalize_text(row["created_by"]) and user_repository.fetch_user(created_by_username):
+            payload["created_by"] = created_by_username
+        if payload:
+            task_repository.update_handover_record(int(row["id"]), payload)
+
+    for row in task_repository.fetch_all_tasks():
+        payload: dict[str, str] = {}
+        assignee_username = _resolve_person_username(row["assignee_user"])
+        creator_username = _resolve_person_username(row["creator_user"])
+        rejected_by_username = _resolve_person_username(row["rejected_by"])
+        if assignee_username and assignee_username != _normalize_text(row["assignee_user"]) and user_repository.fetch_user(assignee_username):
+            payload["assignee_user"] = assignee_username
+        if creator_username and creator_username != _normalize_text(row["creator_user"]) and user_repository.fetch_user(creator_username):
+            payload["creator_user"] = creator_username
+        if rejected_by_username and rejected_by_username != _normalize_text(row["rejected_by"]) and user_repository.fetch_user(rejected_by_username):
+            payload["rejected_by"] = rejected_by_username
+        if payload:
+            task_repository.update_task(int(row["id"]), payload)
 
 
 def _actor_has_level5(actor_username: str) -> bool:
@@ -1365,6 +1481,8 @@ def _is_user_mentioned(user_values: set[str], *texts) -> bool:
 
 
 def _format_remaining_text(minutes_until: int) -> str:
+    if int(minutes_until or 0) < 0:
+        return "已到期"
     safe_minutes = max(0, int(minutes_until or 0))
     total_hours = (safe_minutes + 59) // 60 if safe_minutes else 0
     days = total_hours // 24

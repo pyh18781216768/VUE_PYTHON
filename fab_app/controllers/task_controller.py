@@ -304,9 +304,14 @@ def task_reminders():
 @login_required
 def export_task_records():
     payload = request.get_json(silent=True) or {}
+    export_type = str(payload.get("type", "handover") or "handover").strip().lower()
+    if export_type in {"operation", "operations", "operationlogs", "operation_logs"}:
+        profile = get_user_summary(current_username())
+        if int(profile.get("permissionLevel") or 1) < 5:
+            return jsonify({"message": "当前账号没有导出操作日志的权限。"}), 403
     try:
         buffer, filename, mimetype = export_task_data(
-            payload.get("type", "handover"),
+            export_type,
             payload.get("format", "excel"),
             payload.get("filters") or {},
         )
