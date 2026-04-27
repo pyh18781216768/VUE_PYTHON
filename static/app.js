@@ -2470,7 +2470,7 @@
       }
 
       function toggleNotificationPanel() {
-        notificationPanelOpen.value = true;
+        notificationPanelOpen.value = !notificationPanelOpen.value;
       }
 
       function closeNotificationPanel() {
@@ -2501,7 +2501,6 @@
         if (!item) return;
         const relatedRecord = findNotificationDetailRecord(item);
         markNotificationRead(item);
-        closeNotificationPanel();
         if (!relatedRecord) return;
         if (item.type === "handover") {
           openHandoverDetail(relatedRecord);
