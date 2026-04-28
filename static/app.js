@@ -11,6 +11,10 @@
   const NOTIFICATION_CLEARED_STORAGE_PREFIX = "fab_notification_cleared_";
   const LANGUAGE_STORAGE_KEY = "fab_ui_language";
   const CLIENT_INSTANCE_STORAGE_KEY = "fab_client_instance_id";
+  const WINDOW_INSTANCE_STORAGE_KEY = "fab_window_instance_id";
+  const ACTIVE_LOGIN_WINDOW_STORAGE_PREFIX = "fab_active_login_window_";
+  const ACTIVE_LOGIN_WINDOW_HEARTBEAT_MS = 5000;
+  const ACTIVE_LOGIN_WINDOW_STALE_MS = 15000;
   const DEFAULT_LANGUAGE = "zh-Hant";
   const LANGUAGE_MODES = [
     { key: "zh-Hant", label: "繁體", shortLabel: "繁" },
@@ -20,6 +24,7 @@
   const translationTextCache = new WeakMap();
   const translationAttributeCache = new WeakMap();
   const CLIENT_INSTANCE_ID = initializeClientInstanceId();
+  const WINDOW_INSTANCE_ID = initializeWindowInstanceId();
   const SIMPLIFIED_TO_TRADITIONAL_MAP = {
     "万": "萬", "与": "與", "专": "專", "业": "業", "东": "東", "丝": "絲", "两": "兩", "严": "嚴", "个": "個",
     "临": "臨", "为": "為", "丽": "麗", "举": "舉", "么": "麼", "义": "義", "乌": "烏", "乐": "樂", "乔": "喬",
@@ -364,19 +369,103 @@
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  function initializeClientInstanceId() {
-    const navigationEntry = window.performance?.getEntriesByType?.("navigation")?.[0];
-    const isReload = navigationEntry?.type === "reload";
-    const existingId = window.sessionStorage?.getItem(CLIENT_INSTANCE_STORAGE_KEY);
-    if (isReload && existingId) return existingId;
+  function readStorageValue(storage, key) {
+    try {
+      return storage?.getItem(key) || "";
+    } catch (errorInstance) {
+      return "";
+    }
+  }
 
-    const clientId = createClientInstanceId();
-    window.sessionStorage?.setItem(CLIENT_INSTANCE_STORAGE_KEY, clientId);
+  function writeStorageValue(storage, key, value) {
+    try {
+      storage?.setItem(key, value);
+    } catch (errorInstance) {
+      // Storage can be disabled in private or locked-down browsers.
+    }
+  }
+
+  function removeStorageValue(storage, key) {
+    try {
+      storage?.removeItem(key);
+    } catch (errorInstance) {
+      // Ignore storage cleanup failures.
+    }
+  }
+
+  function initializeClientInstanceId() {
+    const existingId = readStorageValue(window.localStorage, CLIENT_INSTANCE_STORAGE_KEY);
+    if (existingId) return existingId;
+
+    const legacySessionId = readStorageValue(window.sessionStorage, CLIENT_INSTANCE_STORAGE_KEY);
+    const clientId = legacySessionId || createClientInstanceId();
+    writeStorageValue(window.localStorage, CLIENT_INSTANCE_STORAGE_KEY, clientId);
     return clientId;
+  }
+
+  function initializeWindowInstanceId() {
+    const windowId = createClientInstanceId();
+    writeStorageValue(window.sessionStorage, WINDOW_INSTANCE_STORAGE_KEY, windowId);
+    return windowId;
   }
 
   function getClientInstanceHeaders() {
     return { "X-Client-Instance": CLIENT_INSTANCE_ID };
+  }
+
+  function normalizeLoginWindowUsername(username) {
+    return String(username || "").trim().toLowerCase();
+  }
+
+  function getActiveLoginWindowStorageKey(username) {
+    return `${ACTIVE_LOGIN_WINDOW_STORAGE_PREFIX}${encodeURIComponent(normalizeLoginWindowUsername(username))}`;
+  }
+
+  function readActiveLoginWindow(username) {
+    const normalizedUsername = normalizeLoginWindowUsername(username);
+    if (!normalizedUsername) return null;
+    const storageKey = getActiveLoginWindowStorageKey(normalizedUsername);
+    const rawValue = readStorageValue(window.localStorage, storageKey);
+    if (!rawValue) return null;
+    try {
+      return JSON.parse(rawValue);
+    } catch (errorInstance) {
+      removeStorageValue(window.localStorage, storageKey);
+      return null;
+    }
+  }
+
+  function isActiveLoginWindowFresh(record) {
+    const updatedAt = Number(record?.updatedAt || 0);
+    return Boolean(updatedAt && Date.now() - updatedAt <= ACTIVE_LOGIN_WINDOW_STALE_MS);
+  }
+
+  function isOtherActiveLoginWindow(username) {
+    const record = readActiveLoginWindow(username);
+    return Boolean(record && isActiveLoginWindowFresh(record) && record.windowId !== WINDOW_INSTANCE_ID);
+  }
+
+  function writeActiveLoginWindow(username) {
+    const normalizedUsername = normalizeLoginWindowUsername(username);
+    if (!normalizedUsername) return;
+    writeStorageValue(
+      window.localStorage,
+      getActiveLoginWindowStorageKey(normalizedUsername),
+      JSON.stringify({
+        browserId: CLIENT_INSTANCE_ID,
+        windowId: WINDOW_INSTANCE_ID,
+        updatedAt: Date.now(),
+      })
+    );
+  }
+
+  function releaseActiveLoginWindow(username) {
+    const normalizedUsername = normalizeLoginWindowUsername(username);
+    if (!normalizedUsername) return;
+    const record = readActiveLoginWindow(normalizedUsername);
+    if (!record || record.windowId === WINDOW_INSTANCE_ID) {
+      removeStorageValue(window.localStorage, getActiveLoginWindowStorageKey(normalizedUsername));
+    }
   }
 
   const ROUTES = {
@@ -1207,6 +1296,8 @@
         permissionLevel: 1,
         updatedAt: "",
       });
+      let activeLoginWindowUsername = "";
+      let loginWindowHeartbeatTimer = null;
 
       const loginSubmitting = ref(false);
       const loading = ref(true);
@@ -2322,6 +2413,51 @@
         setRoute(ROUTES.home, replace);
       }
 
+      function startLoginWindowHeartbeat(username) {
+        const normalizedUsername = normalizeLoginWindowUsername(username);
+        if (!normalizedUsername) return true;
+        if (isOtherActiveLoginWindow(normalizedUsername)) {
+          return false;
+        }
+
+        if (activeLoginWindowUsername && activeLoginWindowUsername !== normalizedUsername) {
+          releaseActiveLoginWindow(activeLoginWindowUsername);
+        }
+        activeLoginWindowUsername = normalizedUsername;
+        writeActiveLoginWindow(normalizedUsername);
+
+        if (loginWindowHeartbeatTimer) {
+          window.clearInterval(loginWindowHeartbeatTimer);
+        }
+        loginWindowHeartbeatTimer = window.setInterval(() => {
+          if (isOtherActiveLoginWindow(normalizedUsername)) {
+            stopLoginWindowHeartbeat(false);
+            authMessage.value = "此帳號已在其他視窗登入，不能重複開啟。";
+            isAuthenticated.value = false;
+            syncRouteWithState(true);
+            return;
+          }
+          writeActiveLoginWindow(normalizedUsername);
+        }, ACTIVE_LOGIN_WINDOW_HEARTBEAT_MS);
+        return true;
+      }
+
+      function stopLoginWindowHeartbeat(releaseCurrent = true) {
+        const username = activeLoginWindowUsername;
+        if (loginWindowHeartbeatTimer) {
+          window.clearInterval(loginWindowHeartbeatTimer);
+          loginWindowHeartbeatTimer = null;
+        }
+        activeLoginWindowUsername = "";
+        if (releaseCurrent && username) {
+          releaseActiveLoginWindow(username);
+        }
+      }
+
+      function handlePageHide() {
+        stopLoginWindowHeartbeat(true);
+      }
+
       async function requestJson(url, options) {
         const response = await fetch(url, {
           credentials: "same-origin",
@@ -2336,6 +2472,7 @@
         const payload = await response.json().catch(() => ({}));
         if (response.status === 401 && url !== "/api/login") {
           authMessage.value = payload.message || "登入狀態已失效，請重新登入。";
+          stopLoginWindowHeartbeat(true);
           isAuthenticated.value = false;
           authUser.value = {
             username: "",
@@ -2379,6 +2516,7 @@
         const responsePayload = await response.json().catch(() => ({}));
         if (response.status === 401) {
           authMessage.value = responsePayload.message || "登入狀態已失效，請重新登入。";
+          stopLoginWindowHeartbeat(true);
           isAuthenticated.value = false;
           syncRouteWithState(true);
           throw new Error(AUTH_REQUIRED_ERROR);
@@ -2846,9 +2984,19 @@
         authChecking.value = true;
         try {
           const payload = await requestJson("/api/session");
+          const sessionUser = payload.user || authUser.value;
+          if (payload.authenticated && isOtherActiveLoginWindow(sessionUser.username)) {
+            stopLoginWindowHeartbeat(false);
+            isAuthenticated.value = false;
+            authMessage.value = "此帳號已在其他視窗登入，不能重複開啟。";
+            syncRouteWithState(true);
+            return;
+          }
+
           isAuthenticated.value = Boolean(payload.authenticated);
-          authUser.value = payload.user || authUser.value;
+          authUser.value = sessionUser;
           if (isAuthenticated.value) {
+            startLoginWindowHeartbeat(authUser.value.username);
             loadNotificationReads();
             loadNotificationClears();
             resetProfileForm();
@@ -2867,10 +3015,20 @@
         loginSubmitting.value = true;
         authMessage.value = "";
         try {
+          const loginUsername = normalizeLoginWindowUsername(loginForm.username);
+          if (isOtherActiveLoginWindow(loginUsername)) {
+            authMessage.value = "此帳號已在其他視窗登入，不能重複開啟。";
+            return;
+          }
+
           const payload = await requestJson("/api/login", {
             method: "POST",
             body: JSON.stringify(loginForm),
           });
+          if (!startLoginWindowHeartbeat(payload.user?.username)) {
+            authMessage.value = "此帳號已在其他視窗登入，不能重複開啟。";
+            return;
+          }
           isAuthenticated.value = true;
           authUser.value = payload.user;
           loadNotificationReads();
@@ -2889,6 +3047,7 @@
       }
 
       async function logout() {
+        stopLoginWindowHeartbeat(true);
         try {
           await requestJson("/api/logout", { method: "POST" });
         } catch (errorInstance) {
@@ -4905,12 +5064,15 @@
         }
         window.addEventListener("resize", handleResize);
         window.addEventListener("popstate", handlePopState);
+        window.addEventListener("pagehide", handlePageHide);
         scheduleLanguageApply();
       });
 
       onBeforeUnmount(() => {
         window.removeEventListener("resize", handleResize);
         window.removeEventListener("popstate", handlePopState);
+        window.removeEventListener("pagehide", handlePageHide);
+        stopLoginWindowHeartbeat(true);
         if (languageObserver) {
           languageObserver.disconnect();
           languageObserver = null;

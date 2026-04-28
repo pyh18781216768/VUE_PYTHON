@@ -10,7 +10,6 @@ from fab_app.services.user_service import (
     get_user_profile,
     has_active_login_session,
     is_login_token_current,
-    is_login_session_current,
     issue_login_session,
     touch_login_session,
     update_user_profile,
@@ -39,10 +38,6 @@ def _clear_current_session() -> None:
     session.clear()
 
 
-def _is_current_login_session_valid(username: str) -> bool:
-    return is_login_session_current(username, current_session_token(), current_client_instance())
-
-
 def login_required(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
@@ -59,9 +54,6 @@ def login_required(view_func):
         if not is_login_token_current(username, current_session_token()):
             session.clear()
             return jsonify({"message": "此帳號已在其他地方登入，請重新登入。"}), 401
-
-        if not _is_current_login_session_valid(username):
-            return jsonify({"message": "此帳號已在其他視窗登入，不能重複開啟。"}), 409
 
         touch_login_session(username, current_session_token(), current_client_instance())
         return view_func(*args, **kwargs)
@@ -88,15 +80,6 @@ def session_info():
                 "authenticated": False,
                 "user": None,
                 "message": "此帳號已在其他地方登入，請重新登入。",
-            }
-        )
-
-    if not _is_current_login_session_valid(username):
-        return jsonify(
-            {
-                "authenticated": False,
-                "user": None,
-                "message": "此帳號已在其他視窗登入，不能重複開啟。",
             }
         )
 

@@ -192,7 +192,7 @@ def touch_login_session(username: str, token: str, client_id: str) -> None:
     normalized_client_id = _normalize_text(client_id)
     if not normalized_username or not normalized_token or not normalized_client_id:
         return
-    if not is_login_session_current(normalized_username, normalized_token, normalized_client_id):
+    if not is_login_token_current(normalized_username, normalized_token):
         return
     user_repository.update_active_session(
         normalized_username,
