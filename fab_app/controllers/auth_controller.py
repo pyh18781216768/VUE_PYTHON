@@ -42,7 +42,7 @@ def login_required(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
         username = current_username()
-        if not username or not current_session_token() or not current_client_instance():
+        if not username or not current_session_token():
             return jsonify({"message": "請先登入後再訪問。"}), 401
 
         try:
@@ -55,7 +55,9 @@ def login_required(view_func):
             session.clear()
             return jsonify({"message": "此帳號已在其他地方登入，請重新登入。"}), 401
 
-        touch_login_session(username, current_session_token(), current_client_instance())
+        client_instance = current_client_instance()
+        if client_instance:
+            touch_login_session(username, current_session_token(), client_instance)
         return view_func(*args, **kwargs)
 
     return wrapped

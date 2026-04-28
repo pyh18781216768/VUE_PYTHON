@@ -369,6 +369,8 @@ def download_task_attachment(attachment_id: int):
         payload = get_attachment_file(attachment_id)
     except KeyError:
         return jsonify({"message": "附件不存在。"}), 404
+    except FileNotFoundError:
+        return jsonify({"message": "附件文件不存在。"}), 404
     return send_file(
         payload["path"],
         as_attachment=True,
@@ -384,6 +386,8 @@ def preview_task_attachment(attachment_id: int):
         payload = get_attachment_file(attachment_id)
     except KeyError:
         return jsonify({"message": "附件不存在。"}), 404
+    except FileNotFoundError:
+        return jsonify({"message": "附件文件不存在。"}), 404
     content_type = str(payload["contentType"] or "")
     filename = str(payload["filename"] or "").lower()
     image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg")

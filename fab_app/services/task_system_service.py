@@ -1153,8 +1153,11 @@ def get_attachment_file(attachment_id: int) -> dict[str, Any]:
     row = task_repository.fetch_attachment(attachment_id)
     if not row:
         raise KeyError(attachment_id)
+    file_path = Path(row["stored_path"])
+    if not file_path.is_file():
+        raise FileNotFoundError(file_path)
     return {
-        "path": Path(row["stored_path"]),
+        "path": file_path,
         "filename": row["original_name"],
         "contentType": row["content_type"] or "application/octet-stream",
     }
