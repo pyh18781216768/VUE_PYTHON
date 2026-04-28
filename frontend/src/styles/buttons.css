@@ -1,0 +1,64 @@
+.ghost-button,
+.primary-link,
+.primary-button,
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 1px solid rgba(78, 218, 226, 0.22);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: rgba(7, 24, 39, 0.78);
+  color: #dff8ff;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.primary-link,
+.primary-button {
+  margin-top: 14px;
+  background: linear-gradient(135deg, #31d7c6, #27aee6);
+  color: #042033;
+  font-weight: 800;
+}
+
+.primary-button {
+  margin-top: 0;
+}
+
+.danger-button {
+  background: rgba(70, 22, 26, 0.68);
+  border-color: rgba(255, 116, 116, 0.34);
+  color: #ffd4d4;
+}
+
+.ghost-button:hover,
+.primary-link:hover,
+.primary-button:hover,
+.danger-button:hover {
+  border-color: rgba(67, 231, 232, 0.78);
+  background: rgba(46, 207, 210, 0.2);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+}
+
+.table-button {
+  min-height: 32px;
+  padding-inline: 12px;
+}
+
+.table-action-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

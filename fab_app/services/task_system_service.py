@@ -78,7 +78,6 @@ def get_task_system_payload(username: str) -> dict[str, Any]:
         "settings": get_system_settings(),
         "handovers": handovers,
         "tasks": tasks,
-        "reports": get_report_summary(handovers, tasks),
         "reminders": get_reminders(username, tasks, handovers),
         "operationLogs": list_operation_logs({}) if int(user_profile.get("permissionLevel") or 1) >= 5 else [],
         "operationActions": list(OPERATION_ACTIONS),
@@ -930,30 +929,6 @@ def delete_task(task_id: int, actor_username: str | None = None) -> None:
     _delete_attachment_files(attachments)
 
 
-def get_report_summary(
-    handovers: list[dict[str, Any]] | None = None,
-    tasks: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    handovers = handovers if handovers is not None else list_handover_records({})
-    tasks = tasks if tasks is not None else list_tasks({}, handovers=handovers)
-    tasks_by_status = {status: 0 for status in TASK_STATUSES}
-    for task in tasks:
-        tasks_by_status[task["status"]] = tasks_by_status.get(task["status"], 0) + 1
-
-    handovers_by_shift: dict[str, int] = {}
-    for record in handovers:
-        handovers_by_shift[record["shiftName"]] = handovers_by_shift.get(record["shiftName"], 0) + 1
-
-    return {
-        "handoverCount": len(handovers),
-        "taskCount": len(tasks),
-        "completedTaskCount": tasks_by_status.get("已完成", 0),
-        "openTaskCount": tasks_by_status.get("未开始", 0) + tasks_by_status.get("进行中", 0) + tasks_by_status.get("待审核", 0),
-        "tasksByStatus": tasks_by_status,
-        "handoversByShift": handovers_by_shift,
-    }
-
-
 def get_reminders(
     username: str | None = None,
     tasks: list[dict[str, Any]] | None = None,
@@ -965,9 +940,8 @@ def get_reminders(
     handovers = handovers if handovers is not None else list_handover_records({})
 
     due_tasks = []
+    mention_notifications = []
     for task in tasks:
-        if task["status"] in {"待审核", "已完成", "已驳回"}:
-            continue
         related_by_assignee = _is_user_related_to_values(
             user_values,
             task.get("assigneeUserId") or task.get("assigneeUser"),
@@ -978,7 +952,29 @@ def get_reminders(
             task.get("title"),
             task.get("description"),
         )
-        if not (related_by_assignee or related_by_mention or related_by_text_mention):
+
+        if related_by_mention or related_by_text_mention:
+            mention_notifications.append(
+                {
+                    "reminderId": f"mention-task:{task['id']}",
+                    "reminderType": "mention",
+                    "reminderKind": "task-mention",
+                    "reminderTitle": "@提醒",
+                    "sourceType": "task",
+                    "sourceLabel": "任務清單",
+                    "title": task["title"],
+                    "taskId": task["id"],
+                    "assigneeUser": task["assigneeUser"],
+                    "creatorUser": task["creatorUser"],
+                    "mentionUserLabels": task.get("mentionUserLabels"),
+                    "reminderTime": task.get("createdAt") or task.get("updatedAt"),
+                    "description": f"任務 #{task['id']} 中 @ 了你。",
+                }
+            )
+
+        if task["status"] in {"待审核", "已完成", "已驳回"}:
+            continue
+        if not related_by_assignee:
             continue
 
         if task["status"] == "进行中":
@@ -1036,7 +1032,27 @@ def get_reminders(
             record.get("pendingItems"),
             record.get("keywords"),
         )
-        if not (related_by_receiver or related_by_mention or related_by_text_mention):
+
+        if related_by_mention or related_by_text_mention:
+            mention_notifications.append(
+                {
+                    "reminderId": f"mention-handover:{record['id']}",
+                    "reminderType": "mention",
+                    "reminderKind": "handover-mention",
+                    "reminderTitle": "@提醒",
+                    "sourceType": "handover",
+                    "sourceLabel": "交接班記錄",
+                    "title": record.get("keywords") or f"交接班記錄 #{record['id']}",
+                    "handoverRecordId": record["id"],
+                    "handoverUser": record["handoverUser"],
+                    "receiverUser": record["receiverUser"],
+                    "mentionUserLabels": record.get("mentionUserLabels"),
+                    "reminderTime": record.get("createdAt") or record.get("recordTime"),
+                    "description": f"交接班記錄 #{record['id']} 中 @ 了你。",
+                }
+            )
+
+        if not related_by_receiver:
             continue
         receiver_shift = shifts_by_id.get(record.get("receiverShiftGroupId"))
         if not receiver_shift:
@@ -1090,7 +1106,7 @@ def get_reminders(
                     {
                         "reminderId": f"task-review-pending:{submission_id}",
                         "reminderType": "task",
-                        "reminderKind": "review-pending",
+                        "reminderKind": "task",
                         "reminderTitle": "任務狀態為待審核",
                         "title": task["title"],
                         "taskId": task["id"],
@@ -1106,7 +1122,7 @@ def get_reminders(
                     {
                         "reminderId": f"task-review-needed:{submission_id}:{reviewer.get('username')}",
                         "reminderType": "task",
-                        "reminderKind": "review-needed",
+                        "reminderKind": "task",
                         "reminderTitle": "任務待審核評分",
                         "title": task["title"],
                         "taskId": task["id"],
@@ -1125,7 +1141,7 @@ def get_reminders(
                 {
                     "reminderId": f"task-review-result:{submission_id}:{submission_status}",
                     "reminderType": "task",
-                    "reminderKind": "review-result",
+                    "reminderKind": "task",
                     "reminderTitle": "任務審核通過" if passed else "任務審核未通過",
                     "title": task["title"],
                     "taskId": task["id"],
@@ -1146,6 +1162,7 @@ def get_reminders(
         "dueTasks": due_tasks[:10],
         "shiftReminders": shift_reminders,
         "reviewNotifications": review_notifications,
+        "mentionNotifications": mention_notifications,
     }
 
 

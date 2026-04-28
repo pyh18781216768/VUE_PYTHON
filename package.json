@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build"
+  },
   "dependencies": {
     "echarts": "^6.0.0",
     "vue": "^3.5.32"

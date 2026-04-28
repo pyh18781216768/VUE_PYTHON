@@ -16,5 +16,7 @@ web_blueprint = Blueprint("web", __name__)
 @web_blueprint.get("/task-system/users")
 @web_blueprint.get("/task-system/operations")
 @web_blueprint.get("/task-system/settings")
-def index():
-    return render_template("index.html")
+@web_blueprint.get("/frontend")
+@web_blueprint.get("/frontend/<path:subpath>")
+def index(subpath: str | None = None):
+    return render_template("frontend_index.html")

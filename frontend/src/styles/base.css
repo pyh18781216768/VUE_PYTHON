@@ -1,0 +1,50 @@
+html,
+body,
+#frontend-root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(45, 205, 210, 0.16), transparent 28rem),
+    linear-gradient(145deg, #03101f 0%, #061827 54%, #020812 100%);
+  color: #e8f7ff;
+  font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans CJK SC", sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.frontend-shell {
+  min-height: 100vh;
+  display: block;
+}
+
+.frontend-main {
+  width: min(1480px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 88px 0 52px;
+}
+
+.frontend-top-tools {
+  position: fixed;
+  top: 22px;
+  right: 24px;
+  z-index: 3600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-kicker,
+.drawer-kicker,
+.page-kicker,
+.chart-card-eyebrow {
+  color: #3fe4ec;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}

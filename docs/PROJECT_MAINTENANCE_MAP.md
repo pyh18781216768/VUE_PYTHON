@@ -1,100 +1,146 @@
 # 项目维护地图
 
-这份文档用于以后快速定位需求和问题，尽量做到“改哪个模块，只碰哪个模块”。
+这份文档用于后续快速定位需求，目标是“改哪个模块，尽量只碰哪个模块”。
 
 ## 总体结构
 
 - 入口：`app.py`
-- Flask 应用初始化：`fab_app/__init__.py`
-- 后端路由层：`fab_app/controllers/`
-- 后端业务层：`fab_app/services/`
-- 后端数据库层：`fab_app/repositories/`
-- 前端页面模板：`templates/index.html`
-- 前端交互逻辑：`static/app.js`
-- 前端样式：`static/styles.css`
-- 本地 Vue/ECharts：`static/vendor/`
+- Flask 初始化：`fab_app/__init__.py`
+- 后端路由：`fab_app/controllers/`
+- 后端业务：`fab_app/services/`
+- 数据库访问：`fab_app/repositories/`
+- 新 Vue 工程：`frontend/`
+- 新 Vue 打包产物：`static/frontend/`
+- 新 Vue 入口模板：`templates/frontend_index.html`
+- 旧 Vue 模板：`templates/index.html`
+- 旧 Vue 逻辑：`static/app.js`
+- 旧样式：`static/styles.css`
 
-## 模块定位
+## 新 Vue 工程
+
+- 入口：`frontend/src/main.js`
+- 根组件：`frontend/src/App.vue`
+- 路由：`frontend/src/router/index.js`
+- API：`frontend/src/api/`
+- 状态管理：`frontend/src/stores/`
+- 通用组件：`frontend/src/components/`
+- 组合式逻辑：`frontend/src/composables/`
+- 页面：`frontend/src/views/`
+- 工程化样式：`frontend/src/styles/frontend.css`
+- 旧页面托管：`frontend/src/views/LegacyAppHost.vue`
+
+当前已新增页面：
+
+- `frontend/src/views/Dashboard.vue`
+- `frontend/src/views/Handover.vue`
+- `frontend/src/views/Tasks.vue`
+- `frontend/src/views/Upload.vue`
+- `frontend/src/views/Users.vue`
+- `frontend/src/views/Operations.vue`
+- `frontend/src/views/Settings.vue`
+
+当前已新增通用组件：
+
+- `frontend/src/components/Navbar.vue`
+- `frontend/src/components/notifications/NotificationBell.vue`
+- `frontend/src/components/ChartCard.vue`
+- `frontend/src/components/DataTable.vue`
+- `frontend/src/components/ModalDialog.vue`
+- `frontend/src/components/base/SearchableSelect.vue`
+- `frontend/src/components/base/MultiSearchableSelect.vue`
+- `frontend/src/components/handover/AttachmentList.vue`
+- `frontend/src/components/handover/AttachmentPreviewDialog.vue`
+- `frontend/src/components/handover/HandoverFormDialog.vue`
+- `frontend/src/components/handover/HandoverDetailDialog.vue`
+- `frontend/src/components/tasks/TaskFormDialog.vue`
+- `frontend/src/components/tasks/TaskRejectDialog.vue`
+- `frontend/src/components/tasks/TaskSubmitDialog.vue`
+- `frontend/src/components/tasks/TaskReviewDialog.vue`
+- `frontend/src/components/tasks/TaskDetailDialog.vue`
+- `frontend/src/components/users/UserFormDialog.vue`
+- `frontend/src/components/users/UserPermissionDialog.vue`
+- `frontend/src/components/users/UserDetailDialog.vue`
+
+当前已新增组合式逻辑：
+
+- `frontend/src/composables/useTaskSettings.js`
+- `frontend/src/composables/useOperationLogs.js`
+- `frontend/src/composables/useUsers.js`
+- `frontend/src/composables/useHandovers.js`
+- `frontend/src/composables/useTasks.js`
+- `frontend/src/composables/useNotifications.js`
+
+## 业务模块定位
 
 ### 登录、退出、个人信息
 
 - 路由：`fab_app/controllers/auth_controller.py`
 - 业务：`fab_app/services/user_service.py`
 - 数据：`fab_app/repositories/user_repository.py`
-- 前端弹窗：`templates/index.html` 中 `profileDialogOpen`
-- 前端状态/保存：`static/app.js` 中 `profileForm`、`resetProfileForm`、`saveProfile`
-- 常见需求：工号、密码、个人信息字段、主管、登录报错、会话失效
+- 旧前端：`templates/index.html`、`static/app.js`
 
 ### 用户管理
 
 - 路由：`fab_app/controllers/task_controller.py` 中 `/api/task-system/users`
 - 业务：`fab_app/services/task_system_service.py` 中 `list_users`、`save_user`
 - 数据：`fab_app/repositories/user_repository.py`
-- 前端区域：`templates/index.html` 中 `taskSection === 'users'`
-- 前端状态：`static/app.js` 中 `userFilters`、`userForm`、`filteredTaskUsers`
-- 常见需求：工号、姓名、职位、权限等级、账号列表排序、新增/编辑用户
+- 新页面：`frontend/src/views/Users.vue`
+- 当前状态：`/task-system/users` 已切到新 Vue 页面，支持查询、排序、新增、编辑、删除、双击详情和超级管理员赋权。
 
 ### 交接班记录
 
 - 路由：`fab_app/controllers/task_controller.py` 中 `/api/task-system/handover-records`
 - 业务：`fab_app/services/task_system_service.py` 中 `list_handover_records`、`save_handover_record`
-- 数据：`fab_app/repositories/task_repository.py` 中 `HANDOVER_RECORD`
+- 数据：`fab_app/repositories/task_repository.py` 中交接班表
 - 导出：`fab_app/services/task_export_service.py`
-- 前端区域：`templates/index.html` 中 `taskSection === 'handover'`
-- 前端状态：`static/app.js` 中 `handoverFilters`、`handoverForm`、`filteredTaskHandovers`
-- 常见需求：交班班次、接班班次、楼层、接班人、主管、关键词、附件、历史列表字段、排序
+- 新页面：`frontend/src/views/Handover.vue`
+- 当前状态：`/task-system/handover` 已切到新 Vue 页面，支持查询、排序、Excel 导出、新增、编辑、删除、附件下载、图片预览和双击详情。
 
 ### 任务清单
 
 - 路由：`fab_app/controllers/task_controller.py` 中 `/api/task-system/tasks`
 - 业务：`fab_app/services/task_system_service.py` 中 `list_tasks`、`save_task`
-- 数据：`fab_app/repositories/task_repository.py` 中 `TASK_ITEM`
+- 数据：`fab_app/repositories/task_repository.py` 中任务表
 - 导出：`fab_app/services/task_export_service.py`
-- 前端区域：`templates/index.html` 中 `taskSection === 'tasks'`
-- 前端状态：`static/app.js` 中 `taskFilters`、`taskForm`、`filteredTaskItems`
-- 常见需求：开始时间、到期时间、负责人、关联交接班、主管、附件、任务列表字段、排序
+- 新页面：`frontend/src/views/Tasks.vue`
+- 当前状态：`/task-system/tasks` 已切到新 Vue 页面，支持查询、排序、Excel 导出、新增、编辑、删除、领取、驳回、提交审核、评分、附件下载、图片预览和双击详情。
+
+### 通知中心、铃铛提醒
+
+- 路由：复用 `fab_app/controllers/task_controller.py` 中 `/api/task-system/bootstrap` 和 `/api/task-system/reminders`
+- 业务：`fab_app/services/task_system_service.py` 中 `get_reminders`
+- 新组件：`frontend/src/components/notifications/NotificationBell.vue`
+- 新逻辑：`frontend/src/composables/useNotifications.js`
+- 当前状态：新 Vue 页面右上角固定显示铃铛，支持红点计数、提醒弹窗、清除已读、点击消息查看交接班或任务详情。
+
+### 操作记录
+
+- 路由：`fab_app/controllers/task_controller.py` 中 `/api/task-system/operation-logs`
+- 业务：`fab_app/services/task_system_service.py` 中 `list_operation_logs`、`record_operation`
+- 导出：`fab_app/services/task_export_service.py`
+- 新页面：`frontend/src/views/Operations.vue`
+- 当前状态：`/task-system/operations` 已切到新 Vue 页面，支持查询、排序、Excel 导出。
 
 ### 系统设置、班次、楼层、部门
 
 - 路由：`fab_app/controllers/task_controller.py` 中 `/api/task-system/shifts`、`/api/task-system/floors`、`/api/task-system/departments`
 - 业务：`fab_app/services/task_system_service.py` 中 `list_shift_groups`、`save_shift_group`、`list_floors`、`save_floor`、`list_departments`、`save_department`
-- 数据：`fab_app/repositories/task_repository.py` 中 `SHIFT_GROUP`、`FLOOR_SETTING`、`DEPARTMENT_SETTING`
-- 前端区域：`templates/index.html` 中 `taskSection === 'settings'`
-- 前端状态：`static/app.js` 中 `shiftForm`、`floorForm`、`departmentForm`、`filteredShiftOptions`、`filteredFloorOptions`、`filteredDepartmentOptions`
-- 常见需求：新增班次、新增楼层、新增部门、删除、排序、下拉框选项来源
+- 数据：`fab_app/repositories/task_repository.py` 中设置类表
+- 新页面：`frontend/src/views/Settings.vue`
+- 当前状态：`/task-system/settings` 已切到新 Vue 页面，支持新增、搜索、删除。
 
 ### 看板系统
 
 - 路由：`fab_app/controllers/dashboard_controller.py`
 - 业务：`fab_app/services/dashboard_service.py`
-- 导出：`fab_app/services/export_service.py`
 - 数据：`fab_app/repositories/dashboard_repository.py`
-- 页面配置：`static/app.js` 中 `PAGE_CONFIGS`
-- 前端区域：`templates/index.html` 中 `systemMode === 'dashboard'`
-- 常见需求：Angle/OC/Lens 页面、缩略图、图表、看板 Excel 导出、筛选下拉框
+- 导出：`fab_app/services/export_service.py`
+- 新页面：`frontend/src/views/Dashboard.vue`
 
-### 下拉框、弹窗、样式
+## 新需求修改流程
 
-- 搜索下拉组件：`static/app.js` 中 `SearchableSelect`
-- 弹窗层级：`static/styles.css` 中 `modal-layer`、`modal-backdrop`、`searchable-select`
-- 页面缓存版本：`templates/index.html` 中 `styles.css?v=...` 和 `app.js?v=...`
-- 常见需求：下拉框被遮挡、点击后卡住、弹窗模糊、可输入搜索类下拉框、清空后重新选择
-
-## 新增字段的安全流程
-
-1. 数据库层：在 repository 的建表语句和 `ensure_column`/字段列表里加字段。
-2. 业务层：在 service 的保存 payload、列表 summary、筛选搜索里加字段。
-3. 路由层：通常不用动，除非新增接口。
-4. 前端状态：在 `static/app.js` 对应 form/filter/computed 里加字段。
-5. 前端页面：在 `templates/index.html` 对应表单或列表里加字段。
-6. 导出：如果列表字段需要导出，更新对应 export service。
-7. 缓存版本：修改 `templates/index.html` 的 CSS/JS 版本号。
-8. 验证：运行 `scripts/check_project.ps1`。
-
-## 修改时的隔离原则
-
-- 改交接班，不顺手改任务，除非需求明确说“关联任务也要显示”。
-- 改任务，不改看板导出，除非是任务导出。
-- 改看板，不动任务系统接口。
-- 改样式下拉框时优先限定在弹窗或组件范围，避免影响所有页面。
-- 改用户字段时同时检查个人信息、用户管理、权限判断三处。
+1. 先定位后端接口、业务服务、数据库访问文件。
+2. 如果是新页面或新组件，优先写到 `frontend/src/views/` 或 `frontend/src/components/`。
+3. 如果旧页面还没迁移，先保证 `LegacyAppHost.vue` 下的旧功能不受影响。
+4. 每次修改后执行 `powershell -ExecutionPolicy Bypass -File scripts\check_project.ps1`。
+5. 需要上线到 Flask 静态目录时执行 `npm --prefix frontend run build`。

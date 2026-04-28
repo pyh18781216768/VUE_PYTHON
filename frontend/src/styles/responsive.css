@@ -1,0 +1,79 @@
+@media (max-width: 980px) {
+  .frontend-drawer-toggle {
+    top: 78px;
+    width: 46px;
+  }
+
+  .app-navbar {
+    width: min(392px, 94vw);
+    padding: 22px 18px;
+  }
+
+  .metric-grid,
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .frontend-main {
+    width: min(100vw - 24px, 1480px);
+    padding-top: 102px;
+  }
+
+  .frontend-top-tools {
+    top: 14px;
+    right: 12px;
+    gap: 8px;
+  }
+
+  .top-tool-button {
+    padding: 0 11px;
+  }
+
+  .notification-panel {
+    top: calc(100% + 12px);
+    right: 0;
+    width: min(430px, calc(100vw - 24px));
+  }
+
+  .notification-panel::before {
+    top: -8px;
+    right: 15px;
+  }
+
+  .notification-panel-head,
+  .notification-panel-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbar-row,
+  .form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-filter-grid,
+  .dashboard-filter-grid,
+  .dashboard-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-actions,
+  .dashboard-filter-actions,
+  .dashboard-chart-card:last-child {
+    grid-column: auto;
+  }
+
+  .operation-actions,
+  .dashboard-filter-actions {
+    flex-direction: column;
+  }
+}

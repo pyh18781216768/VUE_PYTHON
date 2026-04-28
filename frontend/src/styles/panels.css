@@ -1,0 +1,95 @@
+.frontend-page {
+  display: grid;
+  gap: 22px;
+}
+
+.page-hero,
+.content-panel,
+.chart-card {
+  border: 1px solid rgba(49, 211, 224, 0.22);
+  border-radius: 26px;
+  background:
+    linear-gradient(140deg, rgba(12, 40, 62, 0.92), rgba(4, 16, 29, 0.94)),
+    radial-gradient(circle at top right, rgba(45, 210, 206, 0.18), transparent 20rem);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.28);
+}
+
+.page-hero {
+  padding: 32px;
+}
+
+.page-hero h1,
+.content-panel h2,
+.chart-card h3 {
+  margin: 0;
+}
+
+.page-hero h1 {
+  margin-top: 8px;
+  font-size: clamp(28px, 4vw, 52px);
+}
+
+.page-hero p,
+.content-panel p,
+.chart-card-subtitle {
+  color: #a9c4d5;
+}
+
+.metric-grid,
+.panel-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.panel-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-card {
+  min-height: 148px;
+  padding: 22px;
+}
+
+.chart-card-header,
+.panel-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chart-card-badge {
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(77, 216, 228, 0.12);
+  color: #57f0ee;
+  font-size: 12px;
+}
+
+.chart-card-value {
+  display: block;
+  margin-top: 18px;
+  font-size: clamp(26px, 4vw, 42px);
+  line-height: 1;
+}
+
+.chart-card-blue {
+  border-color: rgba(69, 172, 244, 0.35);
+}
+
+.chart-card-green {
+  border-color: rgba(62, 223, 158, 0.35);
+}
+
+.chart-card-amber {
+  border-color: rgba(255, 193, 99, 0.35);
+}
+
+.content-panel {
+  min-width: 0;
+  padding: 24px;
+}

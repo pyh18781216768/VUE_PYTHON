@@ -19,7 +19,6 @@ from fab_app.services.task_system_service import (
     delete_user,
     get_attachment_file,
     get_reminders,
-    get_report_summary,
     get_task_system_payload,
     get_user_summary,
     get_system_settings,
@@ -322,12 +321,6 @@ def delete_task_item(task_id: int):
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify({"message": "任務已刪除。"})
-
-
-@task_blueprint.get("/api/task-system/reports")
-@login_required
-def task_reports():
-    return jsonify(get_report_summary())
 
 
 @task_blueprint.get("/api/task-system/reminders")

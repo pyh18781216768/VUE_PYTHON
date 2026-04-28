@@ -1,0 +1,206 @@
+.frontend-drawer-toggle {
+  position: fixed;
+  top: 86px;
+  left: 0;
+  z-index: 3200;
+  width: 48px;
+  min-height: 78px;
+  padding: 10px 8px;
+  border: 1px solid rgba(72, 235, 237, 0.45);
+  border-left: 0;
+  border-radius: 0 16px 16px 0;
+  background: linear-gradient(135deg, #1ed5cd, #25aee7);
+  color: #eaffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.35;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.36);
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.frontend-drawer-toggle:hover {
+  filter: brightness(1.08);
+  transform: translateX(2px);
+}
+
+.frontend-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(1px);
+}
+
+.app-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 3300;
+  width: min(418px, 92vw);
+  min-height: 100vh;
+  max-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 24px 22px;
+  border-right: 1px solid rgba(51, 220, 229, 0.18);
+  background:
+    radial-gradient(circle at 110% 14%, rgba(44, 216, 221, 0.16), transparent 14rem),
+    linear-gradient(160deg, rgba(4, 17, 31, 0.98), rgba(2, 10, 19, 0.98));
+  box-shadow: 24px 0 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  overflow-y: auto;
+  transform: translateX(-105%);
+  transition: transform 0.24s ease;
+}
+
+.app-navbar.open {
+  transform: translateX(0);
+}
+
+.drawer-heading,
+.drawer-system-switch,
+.app-nav-links,
+.app-navbar-user {
+  display: flex;
+  align-items: center;
+}
+
+.drawer-heading {
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.drawer-heading > div {
+  display: grid;
+  gap: 6px;
+}
+
+.drawer-heading strong {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.drawer-close {
+  min-width: 64px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 11px;
+  background: #f2f8ff;
+  color: #071626;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.drawer-system-switch {
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.drawer-system-switch a,
+.drawer-system-switch button {
+  flex: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(78, 218, 226, 0.24);
+  border-radius: 12px;
+  background: rgba(8, 28, 45, 0.86);
+  color: #e9fbff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.drawer-system-switch a:hover,
+.drawer-system-switch a.router-link-active,
+.drawer-system-switch button:hover,
+.drawer-system-switch button.active {
+  border-color: rgba(67, 231, 232, 0.78);
+  background: linear-gradient(135deg, #49e0da, #1cafd9);
+  color: #031726;
+  transform: translateY(-1px);
+}
+
+.app-nav-links {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-nav-links a {
+  display: grid;
+  gap: 6px;
+  min-height: 60px;
+  padding: 12px 14px;
+  border: 1px solid rgba(78, 218, 226, 0.22);
+  border-radius: 14px;
+  background: rgba(7, 26, 43, 0.92);
+  color: #dff8ff;
+  font-size: 16px;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.app-nav-links a span {
+  color: #c2d4e4;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-nav-links a strong {
+  font-size: 18px;
+}
+
+.app-nav-links a:hover,
+.app-nav-links a.router-link-active {
+  border-color: rgba(67, 231, 232, 0.78);
+  background: rgba(46, 207, 210, 0.2);
+  transform: translateY(-1px);
+}
+
+.app-navbar-user {
+  margin-top: auto;
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  color: #a9c4d5;
+  font-size: 13px;
+}
+
+.app-navbar-user-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(78, 218, 226, 0.18);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(7, 24, 39, 0.68);
+  color: #d9f5ff;
+}
+
+.app-navbar-user-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

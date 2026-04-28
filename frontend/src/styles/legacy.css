@@ -1,0 +1,30 @@
+.legacy-host,
+.legacy-root {
+  min-height: 100vh;
+}
+
+.legacy-host-state {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  color: #edf7ff;
+  background: radial-gradient(circle at top, #0d3146, #030b14 68%);
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+
+.legacy-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(77, 224, 236, 0.22);
+  border-top-color: #32d6d0;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  justify-self: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -30,7 +30,7 @@ This file is a quick locator for backend changes. Use it before adding fields, c
 - `GET /api/task-system/bootstrap`
   - Controller: `fab_app/controllers/task_controller.py`
   - Service: `get_task_system_payload`
-  - Purpose: initial payload for users, shifts, floors, handovers, tasks, reports, and reminders.
+  - Purpose: initial payload for users, shifts, floors, handovers, tasks, and reminders.
 
 - `GET /api/task-system/users` and `POST /api/task-system/users`
   - Service: `list_users`, `save_user`
@@ -63,10 +63,6 @@ This file is a quick locator for backend changes. Use it before adding fields, c
   - Repository table: `TASK_ITEM`
   - Export: `fab_app/services/task_export_service.py`
   - Frontend: task filters, task modal, and task list.
-
-- `GET /api/task-system/reports`
-  - Service: `get_report_summary`
-  - Purpose: task-system summary cards. If summary cards are removed from UI, keep this only if the bootstrap still needs it.
 
 - `GET /api/task-system/reminders`
   - Service: `get_reminders`

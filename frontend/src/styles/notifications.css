@@ -1,0 +1,209 @@
+.notification-anchor {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.notification-bell,
+.top-tool-button {
+  min-height: 42px;
+  border: 1px solid rgba(78, 218, 226, 0.32);
+  border-radius: 14px;
+  background: rgba(7, 24, 39, 0.86);
+  color: #e8f7ff;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.26);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.notification-bell {
+  position: relative;
+  width: 44px;
+  padding: 0;
+}
+
+.top-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
+.notification-bell:hover,
+.notification-bell.active,
+.top-tool-button:hover {
+  border-color: rgba(67, 231, 232, 0.78);
+  background: rgba(46, 207, 210, 0.2);
+  transform: translateY(-1px);
+}
+
+.notification-bell.has-unread::after {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fb7185;
+  box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.18);
+  content: "";
+}
+
+.notification-bell-icon {
+  font-size: 18px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -7px;
+  min-width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 21px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(225, 29, 72, 0.35);
+}
+
+.notification-panel {
+  position: absolute;
+  top: calc(100% + 14px);
+  right: 0;
+  z-index: 3700;
+  width: min(430px, calc(100vw - 48px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  border: 1px solid rgba(51, 220, 229, 0.28);
+  border-radius: 22px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(48, 218, 220, 0.16), transparent 18rem),
+    rgba(5, 19, 33, 0.98);
+  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.48);
+}
+
+.notification-panel::before {
+  position: absolute;
+  top: -8px;
+  right: 15px;
+  width: 14px;
+  height: 14px;
+  border-left: 1px solid rgba(51, 220, 229, 0.28);
+  border-top: 1px solid rgba(51, 220, 229, 0.28);
+  background: rgba(5, 19, 33, 0.98);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.notification-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.notification-panel-head strong {
+  font-size: 18px;
+}
+
+.notification-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-panel-actions small,
+.notification-empty,
+.notification-item small {
+  color: #a9c4d5;
+}
+
+.notification-mini-button {
+  min-height: 30px;
+  border: 1px solid rgba(78, 218, 226, 0.24);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: rgba(7, 24, 39, 0.78);
+  color: #e8f7ff;
+  cursor: pointer;
+}
+
+.notification-mini-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.notification-empty {
+  padding: 18px;
+  border: 1px dashed rgba(103, 232, 249, 0.18);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.notification-item {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(78, 218, 226, 0.18);
+  border-radius: 16px;
+  padding: 13px 14px;
+  background: rgba(7, 24, 39, 0.74);
+  color: #e8f7ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item + .notification-item {
+  margin-top: 10px;
+}
+
+.notification-item:hover {
+  border-color: rgba(67, 231, 232, 0.58);
+  background: rgba(46, 207, 210, 0.12);
+}
+
+.notification-item.unread {
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: inset 3px 0 0 #fb7185;
+}
+
+.notification-type {
+  width: fit-content;
+  border: 1px solid rgba(45, 212, 191, 0.34);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #7df4e8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.notification-kind-task .notification-type {
+  border-color: rgba(96, 165, 250, 0.46);
+  color: #93c5fd;
+}
+
+.notification-kind-due .notification-type {
+  border-color: rgba(251, 113, 133, 0.5);
+  color: #fda4af;
+}
+
+.notification-kind-handover .notification-type {
+  border-color: rgba(45, 212, 191, 0.5);
+  color: #7df4e8;
+}
+
+.notification-kind-mention .notification-type {
+  border-color: rgba(251, 191, 36, 0.54);
+  color: #fde68a;
+}

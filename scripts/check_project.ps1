@@ -2,8 +2,10 @@ $ErrorActionPreference = "Stop"
 
 & "$PSScriptRoot\check_utf8.ps1"
 
-Write-Host "Checking frontend JavaScript..."
-node --check static\app.js
+if (Test-Path frontend\package.json) {
+  Write-Host "Checking Vue frontend build..."
+  npm --prefix frontend run build
+}
 
 Write-Host "Checking Python files..."
 python -m py_compile `

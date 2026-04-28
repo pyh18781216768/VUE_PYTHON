@@ -1,0 +1,50 @@
+.task-color-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid rgba(76, 222, 225, 0.28);
+  border-radius: 9px;
+  padding: 0 10px;
+  color: #eafcff;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.task-color-box-pending,
+.task-color-box-low {
+  border-color: rgba(96, 180, 255, 0.36);
+  background: rgba(38, 105, 174, 0.26);
+}
+
+.task-color-box-active,
+.task-color-box-medium,
+.task-color-box-review {
+  border-color: rgba(255, 204, 87, 0.42);
+  background: rgba(166, 111, 31, 0.34);
+}
+
+.task-color-box-done {
+  border-color: rgba(73, 231, 164, 0.42);
+  background: rgba(30, 138, 99, 0.34);
+}
+
+.task-color-box-rejected,
+.task-color-box-high {
+  border-color: rgba(255, 111, 111, 0.46);
+  background: rgba(159, 49, 57, 0.34);
+}
+
+.task-review-stack,
+.task-action-buttons {
+  display: grid;
+  gap: 7px;
+}
+
+.task-action-buttons {
+  grid-template-columns: repeat(2, minmax(0, auto));
+}
+
+.task-review-stack small {
+  color: #a9c4d5;
+}
