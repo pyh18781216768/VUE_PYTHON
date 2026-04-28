@@ -545,7 +545,6 @@ def delete_handover_record(record_id: int, actor_username: str | None = None) ->
         raise ValueError("交接班記錄不存在")
     attachments = task_repository.fetch_attachments_for_owner("handover", record_id)
     task_repository.delete_handover_record(record_id)
-    _delete_attachment_files(attachments)
     _safe_record_operation(
         actor_username,
         "交接班記錄",
@@ -553,6 +552,7 @@ def delete_handover_record(record_id: int, actor_username: str | None = None) ->
         f"#{record_id} / {_normalize_text(existing['keywords']) or _normalize_text(existing['title']) or _normalize_text(existing['receiver_user'])}",
         record_id,
     )
+    _delete_attachment_files(attachments)
 
 
 def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
@@ -920,7 +920,6 @@ def delete_task(task_id: int, actor_username: str | None = None) -> None:
             task_repository.fetch_attachments_for_owner("task_submission", int(submission["id"]))
         )
     task_repository.delete_task(task_id)
-    _delete_attachment_files(attachments)
     _safe_record_operation(
         actor_username,
         "任務清單",
@@ -928,6 +927,7 @@ def delete_task(task_id: int, actor_username: str | None = None) -> None:
         f"#{task_id} / {_normalize_text(existing['title'])}",
         task_id,
     )
+    _delete_attachment_files(attachments)
 
 
 def get_report_summary(
@@ -1239,20 +1239,21 @@ def _store_attachments(files, owner_type: str, owner_id: int, actor_username: st
 
 
 def _delete_attachment_files(attachments) -> None:
-    upload_root = UPLOAD_ROOT.resolve()
+    try:
+        upload_root = UPLOAD_ROOT.resolve()
+    except (OSError, RuntimeError):
+        return
     for attachment in attachments:
-        stored_path = _normalize_text(attachment["stored_path"])
-        if not stored_path:
-            continue
         try:
+            stored_path = _normalize_text(attachment["stored_path"])
+            if not stored_path:
+                continue
             file_path = Path(stored_path).resolve()
-        except OSError:
-            continue
-        if file_path != upload_root and upload_root not in file_path.parents:
-            continue
-        try:
-            file_path.unlink(missing_ok=True)
-        except OSError:
+            if file_path != upload_root and upload_root not in file_path.parents:
+                continue
+            if file_path.exists():
+                file_path.unlink()
+        except (KeyError, TypeError, OSError, RuntimeError):
             # The database row is already gone; leave locked files for manual cleanup.
             continue
 
