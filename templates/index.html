@@ -80,23 +80,23 @@
           </div>
 
           <nav v-if="systemMode === 'tasks'" class="drawer-nav">
-            <button :class="{ active: taskSection === 'handover' }" @click="taskSection = 'handover'; navDrawerOpen = false">
+            <button :class="{ active: taskSection === 'handover' }" @click="switchTaskSection('handover')">
               <span>Shift</span>
               <strong>交接班記錄</strong>
             </button>
-            <button :class="{ active: taskSection === 'tasks' }" @click="taskSection = 'tasks'; navDrawerOpen = false">
+            <button :class="{ active: taskSection === 'tasks' }" @click="switchTaskSection('tasks')">
               <span>Task</span>
               <strong>任務跟蹤</strong>
             </button>
-            <button v-if="isAdmin" :class="{ active: taskSection === 'users' }" @click="taskSection = 'users'; navDrawerOpen = false">
+            <button v-if="isAdmin" :class="{ active: taskSection === 'users' }" @click="switchTaskSection('users')">
               <span>Admin</span>
               <strong>使用者管理</strong>
             </button>
-            <button v-if="isAdmin" :class="{ active: taskSection === 'operations' }" @click="taskSection = 'operations'; navDrawerOpen = false">
+            <button v-if="isAdmin" :class="{ active: taskSection === 'operations' }" @click="switchTaskSection('operations')">
               <span>Log</span>
               <strong>操作記錄</strong>
             </button>
-            <button v-if="isAdmin" :class="{ active: taskSection === 'settings' }" @click="taskSection = 'settings'; navDrawerOpen = false">
+            <button v-if="isAdmin" :class="{ active: taskSection === 'settings' }" @click="switchTaskSection('settings')">
               <span>Setup</span>
               <strong>系统设置</strong>
             </button>
@@ -1854,6 +1854,6 @@
 
     <script src="{{ url_for('static', filename='vendor/vue.global.prod.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-16"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260427-17"></script>
   </body>
 </html>

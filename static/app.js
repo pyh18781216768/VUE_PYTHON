@@ -475,6 +475,14 @@
     oc: "/oc",
     lens: "/lens",
   };
+  const DEFAULT_TASK_SECTION = "handover";
+  const TASK_SECTION_ROUTES = {
+    handover: "/task-system/handover",
+    tasks: "/task-system/tasks",
+    users: "/task-system/users",
+    operations: "/task-system/operations",
+    settings: "/task-system/settings",
+  };
 
   const RISK_COLORS = {
     green: "#2dd4bf",
@@ -1338,7 +1346,7 @@
       });
 
       const systemMode = ref(window.localStorage.getItem(ACTIVE_SYSTEM_STORAGE_KEY) || "tasks");
-      const taskSection = ref("handover");
+      const taskSection = ref(DEFAULT_TASK_SECTION);
       const activePage = ref(getPageFromPath(window.location.pathname));
       const dashboard = ref(createEmptyDashboard());
       const taskSystem = ref(createEmptyTaskSystem());
@@ -2395,6 +2403,23 @@
         return PAGE_CONFIGS[stored] ? stored : "angle";
       }
 
+      function getTaskSectionFromPath(pathname) {
+        const match = Object.entries(TASK_SECTION_ROUTES).find(([, route]) => route === pathname);
+        return match ? match[0] : "";
+      }
+
+      function isTaskSectionAllowed(section) {
+        if (!TASK_SECTION_ROUTES[section]) return false;
+        if (["users", "operations", "settings"].includes(section)) {
+          return isAdmin.value;
+        }
+        return true;
+      }
+
+      function resolveTaskSection(section) {
+        return isTaskSectionAllowed(section) ? section : DEFAULT_TASK_SECTION;
+      }
+
       function setRoute(path, replace = false) {
         const current = window.location.pathname + window.location.search;
         if (current === path) return;
@@ -2410,7 +2435,26 @@
           setRoute(pageConfig.value.route, replace);
           return;
         }
-        setRoute(ROUTES.home, replace);
+        const section = resolveTaskSection(taskSection.value);
+        if (section !== taskSection.value) {
+          taskSection.value = section;
+        }
+        setRoute(TASK_SECTION_ROUTES[section], replace);
+      }
+
+      function setTaskSection(section, options = {}) {
+        const nextSection = resolveTaskSection(section);
+        taskSection.value = nextSection;
+        if (options.closeDrawer) {
+          navDrawerOpen.value = false;
+        }
+        if (systemMode.value === "tasks" && !options.skipRoute) {
+          setRoute(TASK_SECTION_ROUTES[nextSection], Boolean(options.replaceRoute));
+        }
+      }
+
+      function switchTaskSection(section) {
+        setTaskSection(section, { closeDrawer: true });
       }
 
       function startLoginWindowHeartbeat(username) {
@@ -3359,7 +3403,7 @@
         handoverForm.keywords = record.keywords;
         handoverForm.mentionUsers = Array.isArray(record.mentionUsers) ? [...record.mentionUsers] : [];
         handoverFiles.value = [];
-        taskSection.value = "handover";
+        setTaskSection("handover");
         handoverFormOpen.value = true;
       }
 
@@ -3375,7 +3419,7 @@
         taskForm.handoverRecordId = String(item.handoverRecordId || "");
         taskForm.mentionUsers = Array.isArray(item.mentionUsers) ? [...item.mentionUsers] : [];
         taskFiles.value = [];
-        taskSection.value = "tasks";
+        setTaskSection("tasks");
         taskFormOpen.value = true;
       }
 
@@ -3388,7 +3432,7 @@
         userForm.phone = item.phone;
         userForm.role = item.role;
         userForm.password = "";
-        taskSection.value = "users";
+        setTaskSection("users");
         userFormOpen.value = true;
       }
 
@@ -4292,7 +4336,7 @@
         if (!["tasks", "dashboard"].includes(mode)) return;
         systemMode.value = mode;
         window.localStorage.setItem(ACTIVE_SYSTEM_STORAGE_KEY, mode);
-        syncRouteWithState(true);
+        syncRouteWithState();
         if (!isAuthenticated.value) return;
         if (mode === "tasks") {
           const hasTaskSystemData =
@@ -4318,10 +4362,20 @@
       }
 
       function applyCurrentPageToState(replaceRoute = false) {
-        const routePage = getPageFromPath(window.location.pathname);
+        const pathname = window.location.pathname;
+        const routePage = getPageFromPath(pathname);
+        const routeTaskSection = getTaskSectionFromPath(pathname);
         activePage.value = PAGE_CONFIGS[routePage] ? routePage : "angle";
         const storedSystem = window.localStorage.getItem(ACTIVE_SYSTEM_STORAGE_KEY);
-        systemMode.value = storedSystem === "dashboard" ? "dashboard" : "tasks";
+        if (PAGE_CONFIGS[routePage] && PAGE_CONFIGS[routePage].route === pathname) {
+          systemMode.value = "dashboard";
+        } else if (routeTaskSection) {
+          systemMode.value = "tasks";
+          setTaskSection(routeTaskSection, { skipRoute: true });
+        } else {
+          systemMode.value = storedSystem === "dashboard" ? "dashboard" : "tasks";
+        }
+        window.localStorage.setItem(ACTIVE_SYSTEM_STORAGE_KEY, systemMode.value);
         syncRouteWithState(replaceRoute);
       }
 
@@ -5229,6 +5283,7 @@
         markNotificationRead,
         cycleLanguage,
         switchSystem,
+        switchTaskSection,
         switchPage,
         refreshActivePage,
         resetFilters,
