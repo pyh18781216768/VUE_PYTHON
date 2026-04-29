@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from "vue";
 
+import { logOperation } from "./operationLogger";
 import { deleteUserByUsername, loadUserLookups, saveUser, saveUserPermission } from "./users/userApi";
 import { createDefaultUserSorts, createPermissionForm, createUserForm, ROLE_OPTIONS } from "./users/userConstants";
 import {
@@ -107,6 +108,7 @@ export function useUsers() {
 
   function openUserDetail(user) {
     detailUser.value = user;
+    logOperation("使用者管理", "查看", userOperationLabel(user), user?.id || user?.username);
   }
 
   function closeUserDetail() {
@@ -188,6 +190,16 @@ export function useUsers() {
 
   function toggleSort(key, event) {
     sorts.value = getNextUserSorts(sorts.value, key, event);
+  }
+
+  function userOperationLabel(user) {
+    return [
+      user?.id ? `#${user.id}` : "",
+      user?.username,
+      user?.displayLabel || user?.displayName,
+    ]
+      .filter(Boolean)
+      .join(" / ");
   }
 
   return {

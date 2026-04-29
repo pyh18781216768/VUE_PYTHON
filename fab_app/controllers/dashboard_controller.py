@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request, send_file
 
-from fab_app.controllers.auth_controller import login_required
+from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.core.database import get_database_path
 from fab_app.services.dashboard_service import get_dashboard_data, get_supported_pages
 from fab_app.services.export_service import export_excel_file
+from fab_app.services.task_system_service import record_operation
 
 
 dashboard_blueprint = Blueprint("dashboard", __name__)
@@ -42,6 +43,13 @@ def export_excel():
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
 
+    _safe_record_dashboard_operation(
+        current_username(),
+        "看板系統",
+        "查看",
+        f"匯出 Excel / {page} / {filename}",
+        page,
+    )
     return send_file(
         buffer,
         as_attachment=True,
@@ -68,3 +76,10 @@ def health():
             "recordCounts": page_counts,
         }
     )
+
+
+def _safe_record_dashboard_operation(operator_username, page_name, action_type, record_label, record_id=""):
+    try:
+        record_operation(operator_username, page_name, action_type, record_label, record_id)
+    except Exception:
+        return

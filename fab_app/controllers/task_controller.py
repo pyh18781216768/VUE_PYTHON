@@ -354,6 +354,13 @@ def export_task_records():
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
 
+    _safe_record_controller_operation(
+        current_username(),
+        _export_page_name(export_type),
+        "查看",
+        f"匯出 Excel / {filename}",
+        export_type,
+    )
     return send_file(
         buffer,
         as_attachment=True,
@@ -371,6 +378,13 @@ def download_task_attachment(attachment_id: int):
         return jsonify({"message": "附件不存在。"}), 404
     except FileNotFoundError:
         return jsonify({"message": "附件文件不存在。"}), 404
+    _safe_record_controller_operation(
+        current_username(),
+        "附件",
+        "查看",
+        f"下載附件 / {payload['filename']}",
+        attachment_id,
+    )
     return send_file(
         payload["path"],
         as_attachment=True,
@@ -394,6 +408,13 @@ def preview_task_attachment(attachment_id: int):
     if not content_type.startswith("image/") and not filename.endswith(image_extensions):
         return jsonify({"message": "該附件不是圖片，無法預覽。"}), 400
     preview_mimetype = content_type if content_type.startswith("image/") else mimetypes.guess_type(filename)[0]
+    _safe_record_controller_operation(
+        current_username(),
+        "附件",
+        "查看",
+        f"預覽附件 / {payload['filename']}",
+        attachment_id,
+    )
     return send_file(
         payload["path"],
         as_attachment=False,
@@ -409,3 +430,19 @@ def _read_payload() -> dict:
         except json.JSONDecodeError as exc:
             raise ValueError("請求資料格式錯誤。") from exc
     return request.get_json(silent=True) or {}
+
+
+def _safe_record_controller_operation(operator_username, page_name, action_type, record_label, record_id=""):
+    try:
+        record_operation(operator_username, page_name, action_type, record_label, record_id)
+    except Exception:
+        return
+
+
+def _export_page_name(export_type: str) -> str:
+    normalized_type = str(export_type or "").strip().lower()
+    if normalized_type in {"task", "tasks"}:
+        return "任務清單"
+    if normalized_type in {"operation", "operations", "operationlogs", "operation_logs"}:
+        return "操作記錄"
+    return "交接班記錄"

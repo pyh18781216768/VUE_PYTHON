@@ -14,6 +14,7 @@ from fab_app.services.user_service import (
     touch_login_session,
     update_user_profile,
 )
+from fab_app.services.task_system_service import record_operation
 
 
 auth_blueprint = Blueprint("auth", __name__)
@@ -159,4 +160,18 @@ def save_profile():
         )
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
+    _safe_record_auth_operation(
+        current_username(),
+        "個人資訊",
+        "修改",
+        f"{profile.get('username', '')} / {profile.get('displayLabel', '')}",
+        profile.get("username", ""),
+    )
     return jsonify({"message": "個人資訊已儲存。", "user": profile})
+
+
+def _safe_record_auth_operation(operator_username, page_name, action_type, record_label, record_id=""):
+    try:
+        record_operation(operator_username, page_name, action_type, record_label, record_id)
+    except Exception:
+        return

@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 
 import { fetchNotificationBootstrap, fetchSession } from "./notifications/notificationApi";
+import { logOperation } from "./operationLogger";
 import {
   CLEARED_STORAGE_PREFIX,
   createEmptyReminders,
@@ -139,10 +140,22 @@ export function useNotifications() {
     actionMessage.value = "";
     if (item.type === "handover") {
       selectedHandover.value = findHandoverForNotification(item, handovers.value);
+      logOperation(
+        "通知提醒",
+        "查看",
+        notificationDetailLabel("交接班詳情", selectedHandover.value, item),
+        selectedHandover.value?.id || item.handoverRecordId,
+      );
       return;
     }
     if (item.type === "task") {
       selectedTask.value = findTaskForNotification(item, tasks.value);
+      logOperation(
+        "通知提醒",
+        "查看",
+        notificationDetailLabel("任務詳情", selectedTask.value, item),
+        selectedTask.value?.id || item.taskId,
+      );
     }
   }
 
@@ -170,6 +183,16 @@ export function useNotifications() {
   function updateCurrentUser(user) {
     if (!user) return;
     currentUser.value = user;
+  }
+
+  function notificationDetailLabel(prefix, detail, item) {
+    return [
+      prefix,
+      detail?.id ? `#${detail.id}` : "",
+      detail?.title || detail?.keywords || item?.title,
+    ]
+      .filter(Boolean)
+      .join(" / ");
   }
 
   function showActionMessage(nextMessage, tone = "success") {

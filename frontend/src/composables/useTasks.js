@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from "vue";
 
 import { createTaskActions } from "./tasks/taskActions";
+import { logOperation } from "./operationLogger";
 import {
   createDefaultTaskSorts,
   createRejectForm,
@@ -183,6 +184,7 @@ export function useTasks() {
 
   function openDetail(task) {
     detailTask.value = task;
+    logOperation("任務清單", "查看", taskOperationLabel(task), task?.id);
   }
 
   function closeDetail() {
@@ -199,6 +201,16 @@ export function useTasks() {
 
   function getHandoverRecordLabel(recordId) {
     return createHandoverRecordLabel(recordId, handovers.value, formatDateTime);
+  }
+
+  function taskOperationLabel(task) {
+    return [
+      task?.id ? `#${task.id}` : "",
+      task?.title,
+      task?.assigneeUser,
+    ]
+      .filter(Boolean)
+      .join(" / ");
   }
 
   const {

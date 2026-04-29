@@ -7,6 +7,7 @@ import {
   loadHandoverLookups,
   saveHandoverRecord,
 } from "./handovers/handoverApi";
+import { logOperation } from "./operationLogger";
 import { createDefaultHandoverSorts, createHandoverForm } from "./handovers/handoverConstants";
 import {
   fillHandoverFormFromRecord,
@@ -199,6 +200,7 @@ export function useHandovers() {
 
   function openDetail(record) {
     detailRecord.value = record;
+    logOperation("交接班記錄", "查看", handoverOperationLabel(record), record?.id);
   }
 
   function closeDetail() {
@@ -215,6 +217,17 @@ export function useHandovers() {
 
   function handleFileSelection(event) {
     files.value = selectedFilesFromEvent(event);
+  }
+
+  function handoverOperationLabel(record) {
+    return [
+      record?.id ? `#${record.id}` : "",
+      normalizeText(record?.keywords),
+      normalizeText(record?.floorName),
+      normalizeText(record?.receiverUser),
+    ]
+      .filter(Boolean)
+      .join(" / ");
   }
 
   return {
