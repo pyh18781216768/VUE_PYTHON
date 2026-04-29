@@ -57,10 +57,7 @@
         <span>任務說明</span>
         <textarea v-model.trim="form.description" rows="5" placeholder="輸入任務背景、處理步驟與要求"></textarea>
       </label>
-      <label class="form-span-all">
-        <span>附件上傳</span>
-        <input :key="fileInputKey" type="file" multiple @change="$emit('file-change', $event)" />
-      </label>
+      <FileUploadField class="form-span-all" :files="files" label="附件上傳" @file-change="$emit('file-change', $event)" />
       <p v-if="files.length" class="subtle-text form-span-all">已選擇 {{ files.length }} 個附件</p>
       <p v-if="message" :class="['inline-message form-span-all', messageTone === 'success' ? 'inline-success' : 'inline-error']">
         {{ message }}
@@ -81,8 +78,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
-
+import FileUploadField from "@/components/base/FileUploadField.vue";
 import ModalDialog from "@/components/ModalDialog.vue";
 import MultiSearchableSelect from "@/components/base/MultiSearchableSelect.vue";
 import SearchableSelect from "@/components/base/SearchableSelect.vue";
@@ -103,6 +99,4 @@ const props = defineProps({
   submitting: { type: Boolean, default: false },
   userOptions: { type: Array, default: () => [] },
 });
-
-const fileInputKey = computed(() => `${props.open}-${props.files.length}`);
 </script>

@@ -32,25 +32,116 @@
         <h3>任務附件</h3>
         <AttachmentList :attachments="task.attachments || []" @preview="$emit('preview', $event)" />
       </section>
+      <section v-if="actionMode && hasAvailableActions" class="detail-section task-detail-actions">
+        <h3>任務操作</h3>
+        <div class="task-detail-action-row">
+          <button
+            v-if="canClaim"
+            class="primary-button table-button"
+            type="button"
+            :disabled="actionSubmitting"
+            @click="$emit('claim', task)"
+          >
+            領取
+          </button>
+          <button
+            v-if="canReview"
+            class="primary-button table-button"
+            type="button"
+            :disabled="actionSubmitting"
+            @click="activeAction = activeAction === 'review' ? '' : 'review'"
+          >
+            評分
+          </button>
+          <button
+            v-if="canReject"
+            class="ghost-button table-button"
+            type="button"
+            :disabled="actionSubmitting"
+            @click="activeAction = activeAction === 'reject' ? '' : 'reject'"
+          >
+            駁回
+          </button>
+        </div>
+
+        <form v-if="activeAction === 'review'" class="settings-form task-detail-action-form" @submit.prevent="submitReview">
+          <label>
+            <span>評分</span>
+            <input v-model="reviewScore" type="number" min="0" max="100" step="1" placeholder="0-100" />
+          </label>
+          <label class="form-span-all">
+            <span>評語</span>
+            <textarea v-model.trim="reviewComment" rows="4" placeholder="填寫通過理由、扣分點或補充說明"></textarea>
+          </label>
+          <div class="form-actions form-span-all">
+            <button class="primary-button" type="submit" :disabled="actionSubmitting">
+              {{ actionSubmitting ? "提交中..." : "提交評分" }}
+            </button>
+          </div>
+        </form>
+
+        <form v-if="activeAction === 'reject'" class="settings-form task-detail-action-form" @submit.prevent="submitReject">
+          <label class="form-span-all">
+            <span>駁回理由</span>
+            <textarea v-model.trim="rejectReason" rows="4" placeholder="請輸入駁回原因、需要補充的資訊或處理建議"></textarea>
+          </label>
+          <div class="form-actions form-span-all">
+            <button class="primary-button" type="submit" :disabled="actionSubmitting">
+              {{ actionSubmitting ? "駁回中..." : "確認駁回" }}
+            </button>
+          </div>
+        </form>
+
+        <p
+          v-if="actionMessage"
+          :class="['inline-message', actionMessageTone === 'success' ? 'inline-success' : 'inline-error']"
+        >
+          {{ actionMessage }}
+        </p>
+      </section>
     </div>
   </ModalDialog>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 import ModalDialog from "@/components/ModalDialog.vue";
 import AttachmentList from "@/components/handover/AttachmentList.vue";
 
 const props = defineProps({
+  actionMessage: { type: String, default: "" },
+  actionMessageTone: { type: String, default: "success" },
+  actionMode: { type: Boolean, default: false },
+  actionSubmitting: { type: Boolean, default: false },
+  canClaim: { type: Boolean, default: false },
+  canReject: { type: Boolean, default: false },
+  canReview: { type: Boolean, default: false },
   formatDateTime: { type: Function, required: true },
   getHandoverRecordLabel: { type: Function, required: true },
   task: { type: Object, default: null },
 });
 
-defineEmits(["close", "preview"]);
+const emit = defineEmits(["claim", "close", "preview", "reject", "review"]);
+
+const activeAction = ref("");
+const rejectReason = ref("");
+const reviewComment = ref("");
+const reviewScore = ref("");
 
 const title = computed(() => (props.task ? `任務詳情 #${props.task.id}` : "任務詳情"));
+
+const hasAvailableActions = computed(() => props.canClaim || props.canReject || props.canReview);
+
+watch(
+  () => props.task?.id,
+  () => {
+    activeAction.value = "";
+    rejectReason.value = "";
+    reviewComment.value = "";
+    reviewScore.value = "";
+  },
+);
 
 const sections = computed(() => {
   const task = props.task || {};
@@ -93,5 +184,13 @@ const sections = computed(() => {
 
 function valueOrEmpty(value) {
   return value === null || value === undefined || value === "" ? "--" : String(value);
+}
+
+function submitReject() {
+  emit("reject", { task: props.task, reason: rejectReason.value });
+}
+
+function submitReview() {
+  emit("review", { task: props.task, score: reviewScore.value, comment: reviewComment.value });
 }
 </script>

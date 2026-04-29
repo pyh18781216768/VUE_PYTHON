@@ -940,11 +940,16 @@ def get_reminders(
     handovers = handovers if handovers is not None else list_handover_records({})
 
     due_tasks = []
+    review_notifications = []
     mention_notifications = []
     for task in tasks:
         related_by_assignee = _is_user_related_to_values(
             user_values,
             task.get("assigneeUserId") or task.get("assigneeUser"),
+        )
+        related_by_creator = _is_user_related_to_values(
+            user_values,
+            task.get("creatorUserId") or task.get("creatorUser"),
         )
         related_by_mention = _is_user_related_to_any(user_values, task.get("mentionUsers"))
         related_by_text_mention = _is_user_mentioned(
@@ -972,9 +977,50 @@ def get_reminders(
                 }
             )
 
+        if task["status"] == "已驳回" and (related_by_creator or related_by_mention or related_by_text_mention):
+            rejected_time = task.get("rejectedAt") or task.get("updatedAt") or task.get("createdAt")
+            review_notifications.append(
+                {
+                    "reminderId": f"task-rejected:{task['id']}:{rejected_time}",
+                    "reminderType": "task",
+                    "reminderKind": "rejected",
+                    "reminderTitle": "任务已驳回",
+                    "title": task["title"],
+                    "taskId": task["id"],
+                    "assigneeUser": task["assigneeUser"],
+                    "creatorUser": task.get("creatorUser"),
+                    "mentionUserLabels": task.get("mentionUserLabels"),
+                    "rejectReason": task.get("rejectReason"),
+                    "rejectedBy": task.get("rejectedBy"),
+                    "reminderTime": rejected_time,
+                    "description": (
+                        f"任务 #{task['id']} 已被 {task.get('rejectedBy') or '相关人员'} 驳回"
+                        f"，原因：{task.get('rejectReason') or '--'}。"
+                    ),
+                }
+            )
+
         if task["status"] in {"待审核", "已完成", "已驳回"}:
             continue
         if not related_by_assignee:
+            continue
+
+        if task["status"] == "未开始":
+            reminder_time = task.get("createdAt") or task.get("startAt") or task.get("updatedAt")
+            due_tasks.append(
+                {
+                    **task,
+                    "reminderId": f"task-claim:{task['id']}:{reminder_time}",
+                    "reminderType": "task",
+                    "reminderKind": "claim",
+                    "reminderTitle": "任务待领取",
+                    "reminderTime": reminder_time,
+                    "timeLabel": "建立时间",
+                    "minutesUntil": 0,
+                    "remainingText": "待领取",
+                    "description": f"任务 #{task['id']} 正在等待责任人领取。",
+                }
+            )
             continue
 
         if task["status"] == "进行中":
@@ -1079,7 +1125,6 @@ def get_reminders(
             }
         )
 
-    review_notifications = []
     for task in tasks:
         submission = task.get("reviewSubmission") or {}
         submission_id = submission.get("id")

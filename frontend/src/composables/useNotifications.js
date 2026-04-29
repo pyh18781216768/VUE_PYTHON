@@ -11,6 +11,10 @@ import { findHandoverForNotification, findTaskForNotification } from "./notifica
 import { createHandoverRecordLabel, formatDateTime } from "./notifications/notificationFormatters";
 import { createNotificationItems } from "./notifications/notificationItems";
 import { loadIdSet, saveIdSet, storageKey } from "./notifications/notificationStorage";
+import { claimTaskById, rejectTaskById, submitTaskReviewScore } from "./tasks/taskApi";
+import { upsertTask } from "./tasks/taskCollection";
+import { normalizeText } from "./tasks/taskFormatters";
+import { createTaskPermissionHelpers } from "./tasks/taskPermissions";
 
 export { formatDateTime, formatReminderRemaining } from "./notifications/notificationFormatters";
 
@@ -20,10 +24,14 @@ export function useNotifications() {
   const reminders = ref(createEmptyReminders());
   const handovers = ref([]);
   const tasks = ref([]);
+  const users = ref([]);
   const readIds = ref(new Set());
   const clearedIds = ref(new Set());
   const panelOpen = ref(false);
   const loading = ref(false);
+  const actionSubmitting = ref(false);
+  const actionMessage = ref("");
+  const actionMessageTone = ref("success");
   const selectedHandover = ref(null);
   const selectedTask = ref(null);
   const previewFile = ref(null);
@@ -36,6 +44,12 @@ export function useNotifications() {
 
   const unreadCount = computed(() => items.value.filter((item) => item.unread).length);
   const readCount = computed(() => items.value.filter((item) => !item.unread).length);
+  const isAdmin = computed(() => Number(currentUser.value?.permissionLevel || 1) >= 5);
+  const { canClaimTask, canRejectTask, canReviewTask } = createTaskPermissionHelpers({
+    currentUser,
+    users,
+    isAdmin,
+  });
 
   function syncStorageForUser() {
     readIds.value = loadIdSet(readStorageKey.value);
@@ -52,6 +66,7 @@ export function useNotifications() {
         reminders.value = createEmptyReminders();
         handovers.value = [];
         tasks.value = [];
+        users.value = [];
         return;
       }
       syncStorageForUser();
@@ -59,6 +74,7 @@ export function useNotifications() {
       reminders.value = { ...createEmptyReminders(), ...(payload.reminders || {}) };
       handovers.value = payload.handovers || [];
       tasks.value = payload.tasks || [];
+      users.value = payload.users || [];
     } finally {
       loading.value = false;
     }
@@ -106,6 +122,7 @@ export function useNotifications() {
   function openNotificationDetail(item) {
     if (!item) return;
     markRead(item);
+    actionMessage.value = "";
     if (item.type === "handover") {
       selectedHandover.value = findHandoverForNotification(item, handovers.value);
       return;
@@ -121,6 +138,7 @@ export function useNotifications() {
 
   function closeTaskDetail() {
     selectedTask.value = null;
+    actionMessage.value = "";
   }
 
   function openPreview(file) {
@@ -135,10 +153,94 @@ export function useNotifications() {
     return createHandoverRecordLabel(recordId, handovers.value, formatDateTime);
   }
 
+  function showActionMessage(nextMessage, tone = "success") {
+    actionMessage.value = nextMessage;
+    actionMessageTone.value = tone;
+    window.clearTimeout(showActionMessage.timer);
+    if (nextMessage) {
+      showActionMessage.timer = window.setTimeout(() => {
+        actionMessage.value = "";
+      }, 3000);
+    }
+  }
+
+  async function syncTaskAfterAction(task) {
+    if (!task?.id) return;
+    upsertTask(tasks, task);
+    selectedTask.value = task;
+    await loadNotifications().catch(() => {});
+    selectedTask.value = tasks.value.find((item) => Number(item.id) === Number(task.id)) || task;
+  }
+
+  async function claimNotificationTask(task) {
+    if (!task?.id) return false;
+    actionSubmitting.value = true;
+    try {
+      const payload = await claimTaskById(task.id);
+      await syncTaskAfterAction(payload.item);
+      showActionMessage("任務已領取。");
+      return true;
+    } catch (error) {
+      showActionMessage(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    } finally {
+      actionSubmitting.value = false;
+    }
+  }
+
+  async function rejectNotificationTask({ task, reason }) {
+    if (!task?.id) return false;
+    const rejectReason = normalizeText(reason);
+    if (!rejectReason) {
+      showActionMessage("請輸入駁回理由。", "error");
+      return false;
+    }
+    actionSubmitting.value = true;
+    try {
+      const payload = await rejectTaskById(task.id, rejectReason);
+      await syncTaskAfterAction(payload.item);
+      showActionMessage("任務已駁回。");
+      return true;
+    } catch (error) {
+      showActionMessage(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    } finally {
+      actionSubmitting.value = false;
+    }
+  }
+
+  async function reviewNotificationTask({ task, score, comment }) {
+    if (!task?.id) return false;
+    const numericScore = Number(score);
+    if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > 100) {
+      showActionMessage("評分必須在 0-100 之間。", "error");
+      return false;
+    }
+    actionSubmitting.value = true;
+    try {
+      const payload = await submitTaskReviewScore(task.id, numericScore, comment);
+      await syncTaskAfterAction(payload.item);
+      showActionMessage("評分已提交。");
+      return true;
+    } catch (error) {
+      showActionMessage(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    } finally {
+      actionSubmitting.value = false;
+    }
+  }
+
   onBeforeUnmount(stopAutoRefresh);
 
   return {
+    actionMessage,
+    actionMessageTone,
+    actionSubmitting,
     authenticated,
+    canClaimTask,
+    canRejectTask,
+    canReviewTask,
+    claimNotificationTask,
     closeHandoverDetail,
     closePanel,
     closePreview,
@@ -159,6 +261,8 @@ export function useNotifications() {
     selectedTask,
     startAutoRefresh,
     stopAutoRefresh,
+    rejectNotificationTask,
+    reviewNotificationTask,
     togglePanel,
     unreadCount,
   };

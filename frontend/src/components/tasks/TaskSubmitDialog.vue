@@ -6,10 +6,7 @@
         <span>提交內容</span>
         <textarea v-model.trim="form.content" rows="6" placeholder="填寫處理結果、現場情況、結論或需要審核人關注的內容"></textarea>
       </label>
-      <label class="form-span-all">
-        <span>回覆附件</span>
-        <input :key="fileInputKey" type="file" multiple @change="$emit('file-change', $event)" />
-      </label>
+      <FileUploadField class="form-span-all" :files="files" label="回覆附件" @file-change="$emit('file-change', $event)" />
       <p v-if="files.length" class="subtle-text form-span-all">已選擇 {{ files.length }} 個附件</p>
       <p v-if="message" :class="['inline-message form-span-all', messageTone === 'success' ? 'inline-success' : 'inline-error']">
         {{ message }}
@@ -25,8 +22,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
-
+import FileUploadField from "@/components/base/FileUploadField.vue";
 import ModalDialog from "@/components/ModalDialog.vue";
 
 defineEmits(["close", "file-change", "submit"]);
@@ -39,6 +35,4 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   submitting: { type: Boolean, default: false },
 });
-
-const fileInputKey = computed(() => `${props.open}-${props.files.length}`);
 </script>

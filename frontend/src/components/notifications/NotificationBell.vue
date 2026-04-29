@@ -20,15 +20,24 @@
     <NotificationProfileDialog :open="profileOpen" :user="currentUser" @close="profileOpen = false" />
 
     <NotificationDetailStack
+      :action-message="actionMessage"
+      :action-message-tone="actionMessageTone"
+      :action-submitting="actionSubmitting"
+      :can-claim-task="canClaimTask"
+      :can-reject-task="canRejectTask"
+      :can-review-task="canReviewTask"
       :format-date-time="formatDateTime"
       :get-handover-record-label="getHandoverRecordLabel"
       :preview-file="previewFile"
       :selected-handover="selectedHandover"
       :selected-task="selectedTask"
+      @claim-task="claimNotificationTask"
       @close-handover="closeHandoverDetail"
       @close-preview="closePreview"
       @close-task="closeTaskDetail"
       @open-preview="openPreview"
+      @reject-task="rejectNotificationTask"
+      @review-task="reviewNotificationTask"
     />
   </div>
 </template>
@@ -50,7 +59,14 @@ import NotificationTrigger from "./NotificationTrigger.vue";
 const profileOpen = ref(false);
 
 const {
+  actionMessage,
+  actionMessageTone,
+  actionSubmitting,
   authenticated,
+  canClaimTask,
+  canRejectTask,
+  canReviewTask,
+  claimNotificationTask,
   clearRead,
   closeHandoverDetail,
   closePanel,
@@ -67,6 +83,8 @@ const {
   panelOpen,
   previewFile,
   readCount,
+  rejectNotificationTask,
+  reviewNotificationTask,
   selectedHandover,
   selectedTask,
   startAutoRefresh,

@@ -48,3 +48,21 @@
 .task-review-stack small {
   color: #a9c4d5;
 }
+
+.task-detail-actions {
+  border-top: 1px solid rgba(61, 175, 197, 0.18);
+  padding-top: 16px;
+}
+
+.task-detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.task-detail-action-form {
+  border: 1px solid rgba(57, 201, 218, 0.16);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(3, 15, 27, 0.42);
+}

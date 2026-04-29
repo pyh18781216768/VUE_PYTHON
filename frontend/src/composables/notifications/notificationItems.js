@@ -28,19 +28,22 @@ function createTaskItems(reminders) {
     const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期时间" : "开始时间");
     const remainingText = formatReminderRemaining(item);
     const id = item.reminderId || `task:${item.id}:${reminderTime}`;
+    const isClaim = item.reminderKind === "claim";
     return {
       id,
       type: "task",
       category: item.reminderKind === "due" ? "due" : "task",
       typeLabel: item.reminderKind === "due" ? "任务到期提醒" : "任务提醒",
       title: item.reminderTitle || item.title,
-      description: [
-        item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
-        `${timeLabel}：${formatDateTime(reminderTime)}`,
-        remainingText === "已到期" ? "已到期" : `剩余 ${remainingText}`,
-      ]
-        .filter(Boolean)
-        .join(" / "),
+      description:
+        item.description ||
+        [
+          item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+          `${timeLabel}：${formatDateTime(reminderTime)}`,
+          isClaim ? "状态：待领取" : remainingText === "已到期" ? "已到期" : `剩余 ${remainingText}`,
+        ]
+          .filter(Boolean)
+          .join(" / "),
       time: reminderTime,
       taskId: item.id,
     };
