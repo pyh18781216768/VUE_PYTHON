@@ -6,20 +6,20 @@
         :key="field.key"
         :model-value="filters[field.key]"
         class="search-field"
-        :empty-label="field.key === 'snapshotDate' ? '最新数据' : '全部'"
+        :empty-label="field.key === 'snapshotDate' ? '最新資料' : '全部'"
         :label="field.label"
         :options="options[field.key] || []"
-        :placeholder="field.key === 'snapshotDate' ? '选择快照日期' : `搜索${field.label}`"
+        :placeholder="field.key === 'snapshotDate' ? '選擇快照日期' : `搜尋${field.label}`"
         @update:model-value="$emit('update-filter', field.key, $event)"
       />
       <div class="dashboard-filter-actions">
-        <button class="ghost-button" type="button" :disabled="loading" @click="$emit('reset')">重置筛选</button>
-        <button class="ghost-button" type="button" :disabled="loading" @click="$emit('refresh')">刷新数据</button>
+        <button class="ghost-button" type="button" :disabled="loading" @click="$emit('reset')">重置篩選</button>
+        <button class="ghost-button" type="button" :disabled="loading" @click="$emit('refresh')">刷新資料</button>
         <button class="primary-button" type="submit" :disabled="loading">
-          {{ loading ? "查询中..." : "查询" }}
+          {{ loading ? "查詢中..." : "查詢" }}
         </button>
         <button class="primary-button" type="button" :disabled="exporting" @click="$emit('export')">
-          {{ exporting ? "导出中..." : "导出 Excel" }}
+          {{ exporting ? "匯出中..." : "匯出 Excel" }}
         </button>
       </div>
     </form>

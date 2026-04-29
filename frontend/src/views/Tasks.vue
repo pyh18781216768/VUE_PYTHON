@@ -3,7 +3,6 @@
     <div class="page-hero">
       <p class="page-kicker">Tasks</p>
       <h1>任務清單</h1>
-      <p>任務查詢、新增、領取、駁回、提交審核、評分與附件已拆到新 Vue 工程。</p>
     </div>
 
     <p v-if="message" :class="['inline-message', messageTone === 'success' ? 'inline-success' : 'inline-error']">
@@ -32,6 +31,7 @@
       :can-submit-task="canSubmitTask"
       :columns="columns"
       :format-date-time="formatDateTime"
+      :format-task-status-label="formatTaskStatusLabel"
       :get-task-priority-box-class="getTaskPriorityBoxClass"
       :get-task-status-box-class="getTaskStatusBoxClass"
       :rows="rows"
@@ -100,6 +100,7 @@
 
     <TaskDetailDialog
       :format-date-time="formatDateTime"
+      :format-task-status-label="formatTaskStatusLabel"
       :get-handover-record-label="getHandoverRecordLabel"
       :task="detailTask"
       @close="closeDetail"
@@ -144,6 +145,7 @@ const {
   filters,
   form,
   formatDateTime,
+  formatTaskStatusLabel,
   getHandoverRecordLabel,
   getTaskPriorityBoxClass,
   getTaskStatusBoxClass,
@@ -197,7 +199,7 @@ const columns = [
   { key: "assigneeUser", label: "負責人", sortable: true },
   { key: "startAt", label: "開始時間", sortable: true },
   { key: "dueAt", label: "到期時間", sortable: true },
-  { key: "reviewSubmission", label: "審核" },
+  { key: "reviewAverageScore", label: "分數", sortable: true },
   { key: "attachments", label: "附件" },
   { key: "actions", label: "操作" },
 ];

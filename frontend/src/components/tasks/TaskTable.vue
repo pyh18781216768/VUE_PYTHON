@@ -18,7 +18,7 @@
         <span :title="row.description">{{ row.title || "--" }}</span>
       </template>
       <template #cell-status="{ value }">
-        <span :class="['task-color-box', getTaskStatusBoxClass(value)]">{{ value || "--" }}</span>
+        <span :class="['task-color-box', getTaskStatusBoxClass(value)]">{{ formatTaskStatusLabel(value) }}</span>
       </template>
       <template #cell-priority="{ value }">
         <span :class="['task-color-box', getTaskPriorityBoxClass(value)]">{{ value || "--" }}</span>
@@ -35,15 +35,10 @@
       <template #cell-mentionUserLabels="{ value }">
         <span :title="value">{{ value || "--" }}</span>
       </template>
-      <template #cell-reviewSubmission="{ row }">
-        <div class="task-review-stack">
-          <span v-if="row.reviewSubmission" :class="['task-color-box', getTaskStatusBoxClass(row.status)]">
-            {{ row.reviewSubmission.statusLabel }}
-          </span>
-          <small v-if="row.reviewSubmission && row.reviewSubmission.averageScore !== null">
-            {{ row.reviewSubmission.averageScore }}分 / {{ row.reviewSubmission.grade || "--" }}
-          </small>
-          <span v-if="!row.reviewSubmission">--</span>
+      <template #cell-reviewAverageScore="{ row, value }">
+        <div class="task-score-stack">
+          <span class="task-score-value">{{ value ?? "--" }}</span>
+          <small v-if="row.reviewGrade">{{ row.reviewGrade }}</small>
         </div>
       </template>
       <template #cell-attachments="{ row }">
@@ -107,6 +102,7 @@ defineProps({
   canSubmitTask: { type: Function, required: true },
   columns: { type: Array, required: true },
   formatDateTime: { type: Function, required: true },
+  formatTaskStatusLabel: { type: Function, required: true },
   getTaskPriorityBoxClass: { type: Function, required: true },
   getTaskStatusBoxClass: { type: Function, required: true },
   rows: { type: Array, default: () => [] },

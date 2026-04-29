@@ -21,6 +21,18 @@ export function formatDateTime(value) {
   return text ? text.slice(0, 16) : "--";
 }
 
+const TASK_STATUS_LABELS = {
+  "未开始": "未開始",
+  "进行中": "進行中",
+  "待审核": "待審核",
+  "已完成": "已完成",
+  "已驳回": "已駁回",
+};
+
+export function formatTaskStatusLabel(status) {
+  return TASK_STATUS_LABELS[status] || status || "--";
+}
+
 export function getTaskStatusBoxClass(status) {
   if (status === "已驳回") return "task-color-box-rejected";
   if (status === "已完成") return "task-color-box-done";

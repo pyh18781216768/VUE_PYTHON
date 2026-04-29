@@ -3,7 +3,7 @@
 
   <div v-if="drawerOpen" class="frontend-drawer-backdrop" @click="closeDrawer"></div>
 
-  <aside :id="drawerId" class="app-navbar" :class="{ open: drawerOpen }" aria-label="系统目录">
+  <aside :id="drawerId" class="app-navbar" :class="{ open: drawerOpen }" aria-label="系統目錄">
     <DrawerHeader @close="closeDrawer" />
     <SystemSwitch v-model="selectedSystem" />
     <NavLinks :external-items="externalNavItems" :route-items="routeNavItems" @navigate="closeDrawer" />
@@ -12,7 +12,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { requestJson } from "@/api/http";
@@ -31,20 +31,20 @@ const selectedSystem = ref(getSystemFromPath(window.location.pathname));
 const navItems = computed(() => {
   if (selectedSystem.value === "dashboard") {
     return [
-      { kicker: "OC", label: "OC 参数", to: "/oc" },
-      { kicker: "ANGLE", label: "Angle 参数", to: "/angle" },
-      { kicker: "LENS", label: "Lens 参数", to: "/lens" },
+      { kicker: "OC", label: "OC 參數", to: "/oc" },
+      { kicker: "ANGLE", label: "Angle 參數", to: "/angle" },
+      { kicker: "LENS", label: "Lens 參數", to: "/lens" },
     ];
   }
 
   const items = [
-    { kicker: "HANDOVER", label: "交接班记录", to: "/frontend/handover" },
-    { kicker: "TASKS", label: "任务清单", to: "/frontend/tasks" },
+    { kicker: "HANDOVER", label: "交接班記錄", to: "/frontend/handover" },
+    { kicker: "TASKS", label: "任務清單", to: "/frontend/tasks" },
   ];
   if (Number(currentUser.value?.permissionLevel || 1) >= 5) {
     items.push({ kicker: "USERS", label: "使用者管理", to: "/frontend/users" });
-    items.push({ kicker: "LOGS", label: "操作记录", to: "/frontend/operations" });
-    items.push({ kicker: "SETTINGS", label: "设置", to: "/frontend/settings" });
+    items.push({ kicker: "LOGS", label: "操作記錄", to: "/frontend/operations" });
+    items.push({ kicker: "SETTINGS", label: "設定", to: "/frontend/settings" });
   }
   return items;
 });
@@ -88,5 +88,14 @@ onMounted(async () => {
   } catch {
     currentUser.value = null;
   }
+  window.addEventListener("profile-updated", handleProfileUpdated);
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener("profile-updated", handleProfileUpdated);
+});
+
+function handleProfileUpdated(event) {
+  currentUser.value = event.detail || currentUser.value;
+}
 </script>

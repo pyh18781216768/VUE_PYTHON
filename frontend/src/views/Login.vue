@@ -2,7 +2,7 @@
   <main class="login-page">
     <section class="login-card">
       <p class="page-kicker">AA Task Gateway</p>
-      <h1>AA 看板任務登入介面</h1>
+      <h1>AA 看板任務登入界面</h1>
       <p class="login-subtitle">請使用工號和密碼登入任務看板系統。</p>
 
       <div v-if="checking" class="login-state">

@@ -14,6 +14,7 @@
     :can-reject="Boolean(selectedTask && canRejectTask(selectedTask))"
     :can-review="Boolean(selectedTask && canReviewTask(selectedTask))"
     :format-date-time="formatDateTime"
+    :format-task-status-label="formatTaskStatusLabel"
     :get-handover-record-label="getHandoverRecordLabel"
     :task="selectedTask"
     @claim="$emit('claim-task', $event)"
@@ -48,6 +49,7 @@ defineProps({
   canRejectTask: { type: Function, required: true },
   canReviewTask: { type: Function, required: true },
   formatDateTime: { type: Function, required: true },
+  formatTaskStatusLabel: { type: Function, required: true },
   getHandoverRecordLabel: { type: Function, required: true },
   previewFile: { type: Object, default: null },
   selectedHandover: { type: Object, default: null },

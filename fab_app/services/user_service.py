@@ -31,6 +31,7 @@ ROLE_ALIASES = {
     "超級管理員": "admin",
     "超级管理员": "admin",
 }
+SUPERVISOR_ROLES = {"line_leader", "section_chief", "department_head"}
 
 
 def ensure_user_store() -> None:
@@ -227,11 +228,19 @@ def update_user_profile(username: str, profile_data, new_password: str | None = 
     if not row:
         raise KeyError(normalized_username)
 
+    supervisor_user = _normalize_text(profile_data.get("supervisor_user"))
+    if supervisor_user:
+        if supervisor_user == normalized_username:
+            raise ValueError("主管不能設定為自己。")
+        supervisor_row = user_repository.fetch_user(supervisor_user)
+        if not supervisor_row or _normalize_role(supervisor_row["role"]) not in SUPERVISOR_ROLES:
+            raise ValueError("主管必須是線組長、科長或部長。")
+
     updated_at = datetime.now().isoformat(timespec="seconds")
     payload = {
         "display_name": _normalize_text(profile_data.get("display_name")),
         "department": _normalize_text(profile_data.get("department")),
-        "supervisor_user": _normalize_text(profile_data.get("supervisor_user")),
+        "supervisor_user": supervisor_user,
         "email": _normalize_text(profile_data.get("email")),
         "phone": _normalize_text(profile_data.get("phone")),
         "updated_at": updated_at,

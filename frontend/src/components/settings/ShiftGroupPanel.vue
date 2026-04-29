@@ -2,10 +2,10 @@
   <SettingListPanel
     :columns="columns"
     create-label="新增班次"
-    empty-text="暂无班次数据"
+    empty-text="暫無班次資料"
     :keyword="keyword"
     :loading="loading"
-    placeholder="搜索班次、时间、排序"
+    placeholder="搜尋班次、時間、排序"
     :rows="rows"
     show-refresh
     :submitting="submitting"
@@ -31,8 +31,8 @@ defineProps({
 
 const columns = [
   { key: "name", label: "班次" },
-  { key: "startTime", label: "开始时间" },
-  { key: "endTime", label: "结束时间" },
+  { key: "startTime", label: "開始時間" },
+  { key: "endTime", label: "結束時間" },
   { key: "sortOrder", label: "排序" },
   { key: "actions", label: "操作" },
 ];

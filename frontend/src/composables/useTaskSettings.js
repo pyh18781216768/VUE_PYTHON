@@ -9,12 +9,12 @@ const RESOURCE_CONFIGS = {
     createDefaults: () => ({ id: "", name: "", startTime: "08:00", endTime: "16:00", sortOrder: 0 }),
   },
   floors: {
-    label: "楼层",
+    label: "樓層",
     endpoint: "/api/task-system/floors",
     createDefaults: () => ({ id: "", name: "", sortOrder: 0 }),
   },
   departments: {
-    label: "部门",
+    label: "部門",
     endpoint: "/api/task-system/departments",
     createDefaults: () => ({ id: "", name: "", sortOrder: 0 }),
   },
@@ -117,7 +117,7 @@ export function useTaskSettings() {
 
   function validateForm() {
     if (!String(form.name || "").trim()) return `${activeConfig.value.label}名称不能为空。`;
-    if (activeResource.value === "shifts" && (!form.startTime || !form.endTime)) return "班次开始和结束时间不能为空。";
+    if (activeResource.value === "shifts" && (!form.startTime || !form.endTime)) return "班次開始和結束時間不能為空。";
     return "";
   }
 
@@ -140,7 +140,7 @@ export function useTaskSettings() {
       const existingIndex = target.findIndex((item) => item.id === savedItem.id);
       if (existingIndex >= 0) target.splice(existingIndex, 1, savedItem);
       else target.push(savedItem);
-      showMessage(`${config.label}已保存。`);
+      showMessage(`${config.label}已儲存。`);
       closeDialog();
       return true;
     } catch (error) {
@@ -153,14 +153,14 @@ export function useTaskSettings() {
 
   async function deleteResource(resource, item) {
     const config = RESOURCE_CONFIGS[resource];
-    if (!window.confirm(`确定删除${config.label}「${item.name}」吗？`)) return false;
+    if (!window.confirm(`確認刪除${config.label}「${item.name}」嗎？`)) return false;
     submitting.value = true;
     try {
       await requestJson(`${config.endpoint}/${item.id}`, { method: "DELETE" });
       const target = resources[resource];
       const index = target.findIndex((entry) => entry.id === item.id);
       if (index >= 0) target.splice(index, 1);
-      showMessage(`${config.label}已删除。`);
+      showMessage(`${config.label}已刪除。`);
       return true;
     } catch (error) {
       showMessage(error instanceof Error ? error.message : String(error), "error");

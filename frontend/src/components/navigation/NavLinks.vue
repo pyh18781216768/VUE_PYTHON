@@ -35,7 +35,15 @@ function isActive(path) {
 }
 
 async function navigateTo(path) {
-  await router.push(path);
-  emit("navigate");
+  try {
+    await router.push(path);
+    if (router.currentRoute.value.path !== path) {
+      window.location.assign(path);
+      return;
+    }
+    emit("navigate");
+  } catch {
+    window.location.assign(path);
+  }
 }
 </script>

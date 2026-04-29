@@ -14,10 +14,17 @@
       />
     </div>
 
-    <button class="top-tool-button" type="button" @click="profileOpen = true">个人信息</button>
-    <button class="top-tool-button" type="button" @click="logout">退出登录</button>
+    <button class="top-tool-button" type="button" @click="profileOpen = true">個人資訊</button>
+    <button class="top-tool-button" type="button" @click="logout">登出</button>
 
-    <NotificationProfileDialog :open="profileOpen" :user="currentUser" @close="profileOpen = false" />
+    <NotificationProfileDialog
+      :department-options="departmentOptions"
+      :open="profileOpen"
+      :supervisor-options="supervisorOptions"
+      :user="currentUser"
+      @close="profileOpen = false"
+      @saved="handleProfileSaved"
+    />
 
     <NotificationDetailStack
       :action-message="actionMessage"
@@ -27,6 +34,7 @@
       :can-reject-task="canRejectTask"
       :can-review-task="canReviewTask"
       :format-date-time="formatDateTime"
+      :format-task-status-label="formatTaskStatusLabel"
       :get-handover-record-label="getHandoverRecordLabel"
       :preview-file="previewFile"
       :selected-handover="selectedHandover"
@@ -51,6 +59,7 @@ import {
   stopActiveLoginWindowHeartbeat,
 } from "@/composables/auth/loginWindowRegistry";
 import { useNotifications } from "@/composables/useNotifications";
+import { clearAuthenticatedSession, setAuthenticatedSession } from "@/router";
 import NotificationDetailStack from "./NotificationDetailStack.vue";
 import NotificationPanel from "./NotificationPanel.vue";
 import NotificationProfileDialog from "./NotificationProfileDialog.vue";
@@ -73,7 +82,9 @@ const {
   closePreview,
   closeTaskDetail,
   currentUser,
+  departmentOptions,
   formatDateTime,
+  formatTaskStatusLabel,
   getHandoverRecordLabel,
   items,
   loading,
@@ -88,17 +99,27 @@ const {
   selectedHandover,
   selectedTask,
   startAutoRefresh,
+  supervisorOptions,
   togglePanel,
+  updateCurrentUser,
   unreadCount,
 } = useNotifications();
 
+function handleProfileSaved(user) {
+  updateCurrentUser(user);
+  setAuthenticatedSession(user);
+  window.dispatchEvent(new CustomEvent("profile-updated", { detail: user }));
+}
+
 async function logout() {
   stopActiveLoginWindowHeartbeat(true);
+  clearAuthenticatedSession();
   await requestJson("/api/logout", { method: "POST" }).catch(() => {});
   window.location.href = "/login";
 }
 
 function handleLoginWindowConflict() {
+  clearAuthenticatedSession();
   void requestJson("/api/logout", { method: "POST" }).catch(() => {});
   window.location.href = "/login";
 }

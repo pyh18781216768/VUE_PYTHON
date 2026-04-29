@@ -6,7 +6,7 @@ export function createFilterOptions(dimensions = {}, fields = []) {
     const values = dimensions[field.dimension] || [];
     if (field.key === "snapshotDate") {
       output[field.key] = [
-        { value: "latest", label: "最新数据" },
+        { value: "latest", label: "最新資料" },
         ...[...values].reverse().map((value) => ({ value, label: value })),
       ];
     } else {
@@ -59,27 +59,27 @@ export function sortDashboardRows(rows = [], sorts = []) {
 export function createMetricCards(tableRows = [], dashboard = {}) {
   return [
     {
-      title: "筛选记录",
+      title: "篩選記錄",
       value: formatInteger(tableRows.length),
-      subtitle: `全部记录 ${formatInteger(dashboard.recordCount)}`,
+      subtitle: `全部記錄 ${formatInteger(dashboard.recordCount)}`,
       accent: "cyan",
     },
     {
-      title: "数据点",
+      title: "資料點",
       value: formatInteger(dashboard.pointCount),
-      subtitle: "当前参数历史点数量",
+      subtitle: "目前參數歷史點數量",
       accent: "blue",
     },
     {
       title: "最新日期",
       value: dashboard.latestAvailableDate || "--",
-      subtitle: "后端可用的最新快照",
+      subtitle: "後端可用的最新快照",
       accent: "green",
     },
     {
-      title: "数据库行数",
+      title: "資料庫行數",
       value: formatInteger(dashboard.databaseRowCount),
-      subtitle: "源表合计行数",
+      subtitle: "來源表合計行數",
       accent: "amber",
     },
   ];

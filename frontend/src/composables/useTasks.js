@@ -26,6 +26,7 @@ import { clearTaskFilters, createTaskFilters } from "./tasks/taskFilters";
 import {
   createHandoverRecordLabel,
   formatDateTime,
+  formatTaskStatusLabel,
   getTaskPriorityBoxClass,
   getTaskStatusBoxClass,
   userOptionLabel,
@@ -33,7 +34,7 @@ import {
 import { createTaskPermissionHelpers } from "./tasks/taskPermissions";
 import { getNextTaskSorts, sortTaskRows } from "./tasks/taskSorting";
 
-export { formatDateTime, getTaskPriorityBoxClass, getTaskStatusBoxClass } from "./tasks/taskFormatters";
+export { formatDateTime, formatTaskStatusLabel, getTaskPriorityBoxClass, getTaskStatusBoxClass } from "./tasks/taskFormatters";
 
 export function useTasks() {
   const currentUser = ref(null);
@@ -66,10 +67,12 @@ export function useTasks() {
   const isEditing = computed(() => Boolean(form.id));
   const userOptions = computed(() => users.value.map((item) => ({ value: item.username, label: userOptionLabel(item) })));
   const mentionUserOptions = computed(() => userOptions.value);
-  const statusOptions = computed(() => statusOptionsRaw.value.map((item) => ({ value: item, label: item })));
+  const statusOptions = computed(() => statusOptionsRaw.value.map((item) => ({ value: item, label: formatTaskStatusLabel(item) })));
   const taskFormStatusOptions = computed(() => {
     const options = statusOptions.value.filter((item) => !TASK_FORM_HIDDEN_STATUSES.has(item.value));
-    if (TASK_FORM_HIDDEN_STATUSES.has(form.status)) return [...options, { value: form.status, label: form.status }];
+    if (TASK_FORM_HIDDEN_STATUSES.has(form.status)) {
+      return [...options, { value: form.status, label: formatTaskStatusLabel(form.status) }];
+    }
     return options;
   });
   const priorityOptions = computed(() => priorityOptionsRaw.value.map((item) => ({ value: item, label: item })));
@@ -253,6 +256,7 @@ export function useTasks() {
     filters,
     form,
     formatDateTime,
+    formatTaskStatusLabel,
     getHandoverRecordLabel,
     getTaskPriorityBoxClass,
     getTaskStatusBoxClass,

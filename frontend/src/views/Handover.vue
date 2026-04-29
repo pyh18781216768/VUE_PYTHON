@@ -3,7 +3,6 @@
     <div class="page-hero">
       <p class="page-kicker">Handover</p>
       <h1>交接班記錄</h1>
-      <p>交接班查詢、新增、編輯、附件與詳情已拆到新 Vue 工程。</p>
     </div>
 
     <p v-if="message" :class="['inline-message', messageTone === 'success' ? 'inline-success' : 'inline-error']">

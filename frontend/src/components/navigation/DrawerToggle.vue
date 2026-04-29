@@ -6,7 +6,7 @@
     :aria-controls="controls"
     @click="$emit('open')"
   >
-    目录
+    目錄
   </button>
 </template>
 

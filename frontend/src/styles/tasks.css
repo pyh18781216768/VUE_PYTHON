@@ -35,7 +35,7 @@
   background: rgba(159, 49, 57, 0.34);
 }
 
-.task-review-stack,
+.task-score-stack,
 .task-action-buttons {
   display: grid;
   gap: 7px;
@@ -45,8 +45,13 @@
   grid-template-columns: repeat(2, minmax(0, auto));
 }
 
-.task-review-stack small {
+.task-score-stack small {
   color: #a9c4d5;
+}
+
+.task-score-value {
+  font-weight: 900;
+  color: #eafcff;
 }
 
 .task-detail-actions {

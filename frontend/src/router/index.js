@@ -39,9 +39,23 @@ const router = createRouter({
   routes,
 });
 
+let cachedSession = null;
+
+export function setAuthenticatedSession(user) {
+  cachedSession = { authenticated: Boolean(user), user: user || null };
+}
+
+export function clearAuthenticatedSession() {
+  cachedSession = null;
+}
+
 router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true;
-  const session = await requestJson("/api/session").catch(() => ({ authenticated: false }));
+  const session =
+    cachedSession?.authenticated
+      ? cachedSession
+      : await requestJson("/api/session").catch(() => ({ authenticated: false }));
+  cachedSession = session.authenticated ? session : null;
   if (!session.authenticated) {
     return { path: "/login", query: { redirect: to.fullPath } };
   }

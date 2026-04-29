@@ -8,7 +8,7 @@
             <p v-if="eyebrow" class="page-kicker">{{ eyebrow }}</p>
             <h2>{{ title }}</h2>
           </div>
-          <button class="ghost-button" type="button" @click="$emit('close')">关闭</button>
+          <button class="ghost-button" type="button" @click="$emit('close')">關閉</button>
         </header>
         <slot />
       </article>

@@ -1,13 +1,13 @@
 <template>
   <SettingListPanel
     :columns="columns"
-    create-label="新增楼层"
-    empty-text="暂无楼层数据"
+    create-label="新增樓層"
+    empty-text="暫無樓層資料"
     :keyword="keyword"
-    placeholder="搜索楼层、排序"
+    placeholder="搜尋樓層、排序"
     :rows="rows"
     :submitting="submitting"
-    title="楼层列表"
+    title="樓層列表"
     @create="$emit('create')"
     @delete="$emit('delete', $event)"
     @update:keyword="$emit('update:keyword', $event)"
@@ -26,9 +26,9 @@ defineProps({
 });
 
 const columns = [
-  { key: "name", label: "名称" },
+  { key: "name", label: "名稱" },
   { key: "sortOrder", label: "排序" },
-  { key: "createdAt", label: "创建时间" },
+  { key: "createdAt", label: "建立時間" },
   { key: "actions", label: "操作" },
 ];
 </script>

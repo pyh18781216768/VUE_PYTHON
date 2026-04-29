@@ -2,6 +2,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { requestJson } from "@/api/http";
+import { setAuthenticatedSession } from "@/router";
 import {
   installActiveLoginWindowCleanup,
   isOtherActiveLoginWindow,
@@ -51,6 +52,7 @@ export function useLogin() {
     try {
       const session = await requestJson("/api/session").catch(() => ({ authenticated: false }));
       if (session.authenticated) {
+        setAuthenticatedSession(session.user);
         startHeartbeat(session.user?.username);
         await router.replace(redirectTarget.value);
       }
@@ -81,6 +83,7 @@ export function useLogin() {
         showConflictMessage();
         return false;
       }
+      setAuthenticatedSession(payload.user);
       await router.replace(redirectTarget.value);
       return true;
     } catch (error) {

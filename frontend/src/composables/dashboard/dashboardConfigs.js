@@ -4,9 +4,9 @@ import { normalizeText } from "@/composables/dashboard/dashboardFormatters";
 
 export const DASHBOARD_CONFIGS = {
   oc: {
-    title: "OC 参数",
+    title: "OC 參數",
     kicker: "OC",
-    subtitle: "按 OC_X / OC_Y 追踪当前快照、趋势与高风险组合。",
+    subtitle: "按 OC_X / OC_Y 追蹤目前快照、趨勢與高風險組合。",
     metricName: "|OC|",
     metricFormat: "decimal",
     exportFilename: "oc_parameters.xlsx",
@@ -32,7 +32,7 @@ export const DASHBOARD_CONFIGS = {
     ],
   },
   angle: {
-    title: "Angle 参数",
+    title: "Angle 參數",
     kicker: "ANGLE",
     subtitle: "按 Angle_X / Angle_Y 追踪 OOS Rate、投入与 Fail。",
     metricName: "OOS Rate",
@@ -62,7 +62,7 @@ export const DASHBOARD_CONFIGS = {
     ],
   },
   lens: {
-    title: "Lens 参数",
+    title: "Lens 參數",
     kicker: "LENS",
     subtitle: "按 Lens PP、Config 与 AA Time 追踪 Fail Rate。",
     metricName: "Fail Rate",

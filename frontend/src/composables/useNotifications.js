@@ -13,7 +13,7 @@ import { createNotificationItems } from "./notifications/notificationItems";
 import { loadIdSet, saveIdSet, storageKey } from "./notifications/notificationStorage";
 import { claimTaskById, rejectTaskById, submitTaskReviewScore } from "./tasks/taskApi";
 import { upsertTask } from "./tasks/taskCollection";
-import { normalizeText } from "./tasks/taskFormatters";
+import { formatTaskStatusLabel, normalizeText } from "./tasks/taskFormatters";
 import { createTaskPermissionHelpers } from "./tasks/taskPermissions";
 
 export { formatDateTime, formatReminderRemaining } from "./notifications/notificationFormatters";
@@ -25,6 +25,7 @@ export function useNotifications() {
   const handovers = ref([]);
   const tasks = ref([]);
   const users = ref([]);
+  const departments = ref([]);
   const readIds = ref(new Set());
   const clearedIds = ref(new Set());
   const panelOpen = ref(false);
@@ -45,6 +46,17 @@ export function useNotifications() {
   const unreadCount = computed(() => items.value.filter((item) => item.unread).length);
   const readCount = computed(() => items.value.filter((item) => !item.unread).length);
   const isAdmin = computed(() => Number(currentUser.value?.permissionLevel || 1) >= 5);
+  const departmentOptions = computed(() => departments.value.map((item) => ({ value: item.name, label: item.name })));
+  const supervisorOptions = computed(() =>
+    users.value
+      .filter((item) => ["line_leader", "section_chief", "department_head"].includes(item.role))
+      .map((item) => ({
+        value: item.username,
+        label: [item.displayLabel || item.displayName || item.username, item.username, item.department]
+          .filter(Boolean)
+          .join(" / "),
+      })),
+  );
   const { canClaimTask, canRejectTask, canReviewTask } = createTaskPermissionHelpers({
     currentUser,
     users,
@@ -67,6 +79,7 @@ export function useNotifications() {
         handovers.value = [];
         tasks.value = [];
         users.value = [];
+        departments.value = [];
         return;
       }
       syncStorageForUser();
@@ -75,6 +88,7 @@ export function useNotifications() {
       handovers.value = payload.handovers || [];
       tasks.value = payload.tasks || [];
       users.value = payload.users || [];
+      departments.value = payload.departments || [];
     } finally {
       loading.value = false;
     }
@@ -151,6 +165,11 @@ export function useNotifications() {
 
   function getHandoverRecordLabel(recordId) {
     return createHandoverRecordLabel(recordId, handovers.value, formatDateTime);
+  }
+
+  function updateCurrentUser(user) {
+    if (!user) return;
+    currentUser.value = user;
   }
 
   function showActionMessage(nextMessage, tone = "success") {
@@ -247,7 +266,9 @@ export function useNotifications() {
     closeTaskDetail,
     clearRead,
     currentUser,
+    departmentOptions,
     formatDateTime,
+    formatTaskStatusLabel,
     getHandoverRecordLabel,
     items,
     loading,
@@ -263,7 +284,9 @@ export function useNotifications() {
     stopAutoRefresh,
     rejectNotificationTask,
     reviewNotificationTask,
+    supervisorOptions,
     togglePanel,
+    updateCurrentUser,
     unreadCount,
   };
 }

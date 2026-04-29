@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,7 @@ def ensure_task_system_store() -> None:
     _seed_departments()
     _seed_settings()
     _migrate_person_fields_to_usernames()
+    _seed_completed_task_scores()
 
 
 def get_task_system_payload(username: str) -> dict[str, Any]:
@@ -1815,6 +1817,78 @@ def _migrate_person_fields_to_usernames() -> None:
             payload["rejected_by"] = rejected_by_username
         if payload:
             task_repository.update_task(int(row["id"]), payload)
+
+
+def _seed_completed_task_scores() -> None:
+    now = _now_text()
+    for row in task_repository.fetch_all_tasks():
+        if _normalize_text(row["status"]) != "已完成":
+            continue
+
+        reviewers = _build_task_reviewers_from_row(row)
+        if not reviewers:
+            continue
+
+        task_id = int(row["id"])
+        submission = task_repository.fetch_latest_task_submission(task_id)
+        if submission:
+            submission_id = int(submission["id"])
+        else:
+            submission_id = task_repository.insert_task_submission(
+                {
+                    "task_id": task_id,
+                    "submitter_user": _normalize_text(row["assignee_user"]) or _normalize_text(row["creator_user"]),
+                    "content": "历史完成任务评分补齐",
+                    "status": "passed",
+                    "average_score": None,
+                    "grade": "",
+                    "submitted_at": _normalize_text(row["completed_at"]) or _normalize_text(row["updated_at"]) or now,
+                    "reviewed_at": "",
+                    "updated_at": now,
+                }
+            )
+
+        review_rows = task_repository.fetch_reviews_for_submission(submission_id)
+        score_map = {
+            _normalize_text(review_row["reviewer_user"]): float(review_row["score"])
+            for review_row in review_rows
+        }
+        for reviewer in reviewers:
+            username = reviewer.get("username")
+            if not username or username in score_map:
+                continue
+            score = random.randint(60, 100)
+            task_repository.upsert_task_review(
+                {
+                    "submission_id": submission_id,
+                    "task_id": task_id,
+                    "reviewer_user": username,
+                    "score": score,
+                    "comment": "历史完成任务模拟评分",
+                    "reviewed_at": now,
+                }
+            )
+            score_map[username] = float(score)
+
+        required_scores = [
+            score_map[reviewer["username"]]
+            for reviewer in reviewers
+            if reviewer.get("username") in score_map
+        ]
+        if not required_scores:
+            continue
+
+        average_score = round(sum(required_scores) / len(required_scores), 2)
+        task_repository.update_task_submission(
+            submission_id,
+            {
+                "status": "passed",
+                "average_score": average_score,
+                "grade": _get_review_grade(average_score),
+                "reviewed_at": now,
+                "updated_at": now,
+            },
+        )
 
 
 def _actor_has_level5(actor_username: str) -> bool:

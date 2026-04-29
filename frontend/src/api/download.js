@@ -19,7 +19,7 @@ export async function postDownload(url, payload, fallbackFilename) {
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => ({}));
-    throw new Error(errorPayload.message || "导出失败。");
+    throw new Error(errorPayload.message || "匯出失敗。");
   }
 
   const blob = await response.blob();

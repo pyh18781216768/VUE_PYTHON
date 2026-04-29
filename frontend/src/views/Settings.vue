@@ -2,8 +2,7 @@
   <section class="frontend-page">
     <div class="page-hero">
       <p class="page-kicker">Settings</p>
-      <h1>系统设置</h1>
-      <p>班次、楼层、部门已经从旧页面拆到新 Vue 工程，新增与删除都在当前页面完成。</p>
+      <h1>系統設定</h1>
     </div>
 
     <p v-if="actionMessage" :class="['inline-message', actionTone === 'success' ? 'inline-success' : 'inline-error']">
@@ -38,7 +37,7 @@
       />
     </div>
 
-    <p v-if="loading" class="subtle-text">正在加载系统设置...</p>
+    <p v-if="loading" class="subtle-text">正在載入系統設定...</p>
     <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
 
     <SettingFormDialog

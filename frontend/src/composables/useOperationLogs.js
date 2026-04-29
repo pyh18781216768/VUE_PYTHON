@@ -6,8 +6,8 @@ import { requestJson } from "@/api/http";
 const ACTION_LABELS = {
   "鏂板": "新增",
   "淇敼": "修改",
-  "鍒櫎": "删除",
-  "鍒犻櫎": "删除",
+  "鍒櫎": "刪除",
+  "鍒犻櫎": "刪除",
   "鏌ョ湅": "查看",
 };
 
@@ -158,7 +158,7 @@ export function useOperationLogs() {
         { type: "operation", format: "excel", filters: currentFilters() },
         "operation_records.xlsx",
       );
-      showMessage("导出成功。");
+      showMessage("匯出成功。");
     } catch (error) {
       showMessage(error instanceof Error ? error.message : String(error), "error");
     } finally {

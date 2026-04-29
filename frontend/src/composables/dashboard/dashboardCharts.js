@@ -3,8 +3,8 @@ import { formatDashboardMetric } from "@/composables/dashboard/dashboardFormatte
 export function createDashboardChartOptions({ categoryRows = [], metricFormat = "decimal", metricName = "", topRows = [], trendRows = [] }) {
   return {
     trend: createLineOption(trendRows, metricName, metricFormat),
-    category: createBarOption(categoryRows.slice(0, 12), `${metricName} 分类对比`, metricFormat),
-    top: createHorizontalBarOption(topRows, "TOP 风险组合", metricFormat),
+    category: createBarOption(categoryRows.slice(0, 12), `${metricName} 分類對比`, metricFormat),
+    top: createHorizontalBarOption(topRows, "TOP 風險組合", metricFormat),
   };
 }
 

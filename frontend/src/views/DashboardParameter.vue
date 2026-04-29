@@ -38,10 +38,10 @@
     <section class="content-panel">
       <div class="panel-title-row">
         <div>
-          <h2>数据源</h2>
+          <h2>資料源</h2>
           <p>{{ dashboard.databasePath || "--" }}</p>
         </div>
-        <span class="subtle-text">生成时间：{{ formatGeneratedAt(dashboard.generatedAt) }}</span>
+        <span class="subtle-text">生成時間：{{ formatGeneratedAt(dashboard.generatedAt) }}</span>
       </div>
       <DataTable :columns="sourceColumns" :rows="dashboard.tables || []" row-key="tableName" />
     </section>
@@ -86,7 +86,7 @@ const {
 const sourceColumns = [
   { key: "source", label: "Source" },
   { key: "tableName", label: "表名" },
-  { key: "rowCount", label: "行数" },
+  { key: "rowCount", label: "行數" },
 ];
 
 function updateFilter(key, value) {

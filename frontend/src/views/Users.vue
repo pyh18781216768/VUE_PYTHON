@@ -3,7 +3,6 @@
     <div class="page-hero">
       <p class="page-kicker">Users</p>
       <h1>使用者管理</h1>
-      <p>帳號查詢、排序、新增、編輯、刪除與權限賦予已拆到新 Vue 工程。</p>
     </div>
 
     <p v-if="message" :class="['inline-message', messageTone === 'success' ? 'inline-success' : 'inline-error']">

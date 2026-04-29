@@ -2,16 +2,15 @@
   <section class="content-panel">
     <div class="panel-title-row">
       <div>
-        <h2>操作记录列表</h2>
-        <p>点击表头排序，按住 Shift 可以叠加多重排序。</p>
+        <h2>操作記錄列表</h2>
       </div>
-      <span class="subtle-text">共 {{ rows.length }} 条</span>
+      <span class="subtle-text">共 {{ rows.length }} 筆</span>
     </div>
     <DataTable
       :columns="columns"
       :rows="rows"
       :sorts="sorts"
-      empty-text="当前条件下没有操作记录。"
+      empty-text="目前條件下沒有操作記錄。"
       @sort-change="(key, event) => $emit('sort-change', key, event)"
     >
       <template #cell-operatorLabel="{ row }">
@@ -41,9 +40,9 @@ defineProps({
 const columns = [
   { key: "id", label: "ID", sortable: true },
   { key: "operatorLabel", label: "操作人", sortable: true },
-  { key: "operatedAt", label: "操作时间", sortable: true },
-  { key: "pageName", label: "操作页面", sortable: true },
+  { key: "operatedAt", label: "操作時間", sortable: true },
+  { key: "pageName", label: "操作頁面", sortable: true },
   { key: "actionType", label: "操作功能", sortable: true },
-  { key: "recordLabel", label: "操作记录", sortable: true },
+  { key: "recordLabel", label: "操作記錄", sortable: true },
 ];
 </script>

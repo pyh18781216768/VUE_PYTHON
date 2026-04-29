@@ -118,6 +118,7 @@ const props = defineProps({
   canReject: { type: Boolean, default: false },
   canReview: { type: Boolean, default: false },
   formatDateTime: { type: Function, required: true },
+  formatTaskStatusLabel: { type: Function, required: true },
   getHandoverRecordLabel: { type: Function, required: true },
   task: { type: Object, default: null },
 });
@@ -151,7 +152,7 @@ const sections = computed(() => {
       fields: [
         { label: "ID", value: valueOrEmpty(task.id) },
         { label: "標題", value: valueOrEmpty(task.title), long: true },
-        { label: "狀態", value: valueOrEmpty(task.status) },
+        { label: "狀態", value: props.formatTaskStatusLabel(task.status) },
         { label: "優先級", value: valueOrEmpty(task.priority) },
         { label: "負責人", value: valueOrEmpty(task.assigneeUser) },
         { label: "發布者", value: valueOrEmpty(task.creatorUser) },

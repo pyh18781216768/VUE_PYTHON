@@ -8,7 +8,7 @@
     </div>
     <div class="toolbar-row">
       <label class="search-field">
-        <span>关键词</span>
+        <span>關鍵詞</span>
         <input
           :value="keyword"
           type="text"
@@ -23,7 +23,7 @@
     <DataTable :columns="columns" :rows="rows" :empty-text="emptyText">
       <template #cell-actions="{ row }">
         <button class="danger-button table-button" type="button" :disabled="submitting" @click="$emit('delete', row)">
-          删除
+          刪除
         </button>
       </template>
     </DataTable>
@@ -38,10 +38,10 @@ defineEmits(["create", "delete", "refresh", "update:keyword"]);
 defineProps({
   columns: { type: Array, required: true },
   createLabel: { type: String, required: true },
-  emptyText: { type: String, default: "暂无设置数据" },
+  emptyText: { type: String, default: "暫無設定資料" },
   keyword: { type: String, default: "" },
   loading: { type: Boolean, default: false },
-  placeholder: { type: String, default: "搜索名称、排序" },
+  placeholder: { type: String, default: "搜尋名稱、排序" },
   rows: { type: Array, default: () => [] },
   showRefresh: { type: Boolean, default: false },
   submitting: { type: Boolean, default: false },

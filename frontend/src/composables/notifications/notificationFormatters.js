@@ -22,7 +22,7 @@ export function formatReminderRemaining(item) {
   const totalHours = Math.floor(diffMs / 36e5);
   const days = Math.floor(totalHours / 24);
   const hours = totalHours % 24;
-  return `${days}天${String(hours).padStart(2, "0")}小时`;
+  return `${days}天${String(hours).padStart(2, "0")}小時`;
 }
 
 export function createHandoverRecordLabel(recordId, handovers, formatValue = formatDateTime) {

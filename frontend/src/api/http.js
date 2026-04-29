@@ -30,7 +30,7 @@ export async function requestJson(url, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.message || "请求失败。");
+    throw new Error(payload.message || "請求失敗。");
   }
   return payload;
 }
@@ -52,7 +52,7 @@ export async function requestFormData(url, payload, files = [], options = {}) {
 
   const responsePayload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(responsePayload.message || "请求失败。");
+    throw new Error(responsePayload.message || "請求失敗。");
   }
   return responsePayload;
 }

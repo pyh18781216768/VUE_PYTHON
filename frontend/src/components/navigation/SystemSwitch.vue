@@ -1,10 +1,10 @@
 <template>
-  <div class="drawer-system-switch" aria-label="系统切换">
+  <div class="drawer-system-switch" aria-label="系統切換">
     <button type="button" :class="{ active: modelValue === 'tasks' }" @click="$emit('update:modelValue', 'tasks')">
-      任务系统
+      任務系統
     </button>
     <button type="button" :class="{ active: modelValue === 'dashboard' }" @click="$emit('update:modelValue', 'dashboard')">
-      看板系统
+      看板系統
     </button>
   </div>
 </template>

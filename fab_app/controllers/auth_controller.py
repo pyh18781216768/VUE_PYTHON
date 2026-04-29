@@ -145,15 +145,18 @@ def save_profile():
     else:
         new_password = None
 
-    profile = update_user_profile(
-        current_username(),
-        {
-            "display_name": payload.get("displayName", ""),
-            "department": payload.get("department", ""),
-            "supervisor_user": payload.get("supervisorUser", ""),
-            "email": payload.get("email", ""),
-            "phone": payload.get("phone", ""),
-        },
-        new_password=new_password,
-    )
+    try:
+        profile = update_user_profile(
+            current_username(),
+            {
+                "display_name": payload.get("displayName", ""),
+                "department": payload.get("department", ""),
+                "supervisor_user": payload.get("supervisorUser", ""),
+                "email": payload.get("email", ""),
+                "phone": payload.get("phone", ""),
+            },
+            new_password=new_password,
+        )
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
     return jsonify({"message": "個人資訊已儲存。", "user": profile})

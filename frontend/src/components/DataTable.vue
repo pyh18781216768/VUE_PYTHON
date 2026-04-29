@@ -46,7 +46,7 @@ const props = defineProps({
   columns: { type: Array, required: true },
   rows: { type: Array, default: () => [] },
   rowKey: { type: String, default: "id" },
-  emptyText: { type: String, default: "暂无数据" },
+  emptyText: { type: String, default: "暫無資料" },
   sorts: { type: Array, default: () => [] },
 });
 

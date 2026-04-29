@@ -1,4 +1,5 @@
 import { formatDateTime, formatReminderRemaining, parseTime } from "./notificationFormatters";
+import { formatTaskStatusLabel } from "@/composables/tasks/taskFormatters";
 
 function createShiftItems(reminders) {
   return (reminders.shiftReminders || []).map((item) => {
@@ -12,7 +13,7 @@ function createShiftItems(reminders) {
       description: [
         item.handoverUser && item.receiverUser ? `${item.handoverUser} → ${item.receiverUser}` : "",
         item.keywords || "",
-        `剩余 ${formatReminderRemaining(item)}`,
+        `剩餘 ${formatReminderRemaining(item)}`,
       ]
         .filter(Boolean)
         .join(" / "),
@@ -25,7 +26,7 @@ function createShiftItems(reminders) {
 function createTaskItems(reminders) {
   return (reminders.dueTasks || []).map((item) => {
     const reminderTime = item.reminderTime || item.startAt || item.dueAt;
-    const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期时间" : "开始时间");
+    const timeLabel = item.timeLabel || (item.reminderKind === "due" ? "到期時間" : "開始時間");
     const remainingText = formatReminderRemaining(item);
     const id = item.reminderId || `task:${item.id}:${reminderTime}`;
     const isClaim = item.reminderKind === "claim";
@@ -33,14 +34,14 @@ function createTaskItems(reminders) {
       id,
       type: "task",
       category: item.reminderKind === "due" ? "due" : "task",
-      typeLabel: item.reminderKind === "due" ? "任务到期提醒" : "任务提醒",
+      typeLabel: item.reminderKind === "due" ? "任務到期提醒" : "任務提醒",
       title: item.reminderTitle || item.title,
       description:
         item.description ||
         [
-          item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+          item.assigneeUser ? `負責人：${item.assigneeUser}` : "",
           `${timeLabel}：${formatDateTime(reminderTime)}`,
-          isClaim ? "状态：待领取" : remainingText === "已到期" ? "已到期" : `剩余 ${remainingText}`,
+          isClaim ? "狀態：待領取" : remainingText === "已到期" ? "已到期" : `剩餘 ${remainingText}`,
         ]
           .filter(Boolean)
           .join(" / "),
@@ -58,14 +59,14 @@ function createReviewItems(reminders) {
       id,
       type: "task",
       category: "task",
-      typeLabel: "任务提醒",
+      typeLabel: "任務提醒",
       title: item.reminderTitle || item.title,
       description:
         item.description ||
         [
-          item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
-          item.reviewStatusLabel ? `状态：${item.reviewStatusLabel}` : "",
-          item.grade ? `等级：${item.grade}` : "",
+          item.assigneeUser ? `負責人：${item.assigneeUser}` : "",
+          item.reviewStatusLabel ? `狀態：${formatTaskStatusLabel(item.reviewStatusLabel)}` : "",
+          item.grade ? `等級：${item.grade}` : "",
         ]
           .filter(Boolean)
           .join(" / "),
@@ -91,8 +92,8 @@ function createMentionItems(reminders) {
       description:
         item.description ||
         [
-          item.sourceLabel || (isHandover ? "交接班记录" : "任务清单"),
-          item.assigneeUser ? `负责人：${item.assigneeUser}` : "",
+          item.sourceLabel || (isHandover ? "交接班記錄" : "任務清單"),
+          item.assigneeUser ? `負責人：${item.assigneeUser}` : "",
           item.handoverUser && item.receiverUser ? `${item.handoverUser} → ${item.receiverUser}` : "",
         ]
           .filter(Boolean)

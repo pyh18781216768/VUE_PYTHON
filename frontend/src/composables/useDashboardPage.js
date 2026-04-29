@@ -93,7 +93,7 @@ export function useDashboardPage(pageRef) {
         },
         config.value.exportFilename,
       );
-      showMessage("导出成功。");
+      showMessage("匯出成功。");
     } catch (error) {
       showMessage(error instanceof Error ? error.message : String(error), "error");
     } finally {

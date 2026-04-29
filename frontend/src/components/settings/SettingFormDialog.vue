@@ -2,16 +2,16 @@
   <ModalDialog :open="open" :title="`新增${activeConfig.label}`" eyebrow="Create" @close="$emit('close')">
     <form class="settings-form" @submit.prevent="$emit('submit')">
       <label>
-        <span>{{ activeConfig.label }}名称</span>
-        <input v-model.trim="form.name" type="text" :placeholder="`${activeConfig.label}名称`" />
+        <span>{{ activeConfig.label }}名稱</span>
+        <input v-model.trim="form.name" type="text" :placeholder="`${activeConfig.label}名稱`" />
       </label>
       <template v-if="activeResource === 'shifts'">
         <label>
-          <span>开始时间</span>
+          <span>開始時間</span>
           <input v-model="form.startTime" type="time" />
         </label>
         <label>
-          <span>结束时间</span>
+          <span>結束時間</span>
           <input v-model="form.endTime" type="time" />
         </label>
       </template>
@@ -25,7 +25,7 @@
       <div class="form-actions form-span-all">
         <button class="ghost-button" type="button" @click="$emit('reset')">重置</button>
         <button class="primary-button" type="submit" :disabled="submitting">
-          {{ submitting ? "保存中..." : `保存${activeConfig.label}` }}
+          {{ submitting ? "儲存中..." : `儲存${activeConfig.label}` }}
         </button>
       </div>
     </form>
