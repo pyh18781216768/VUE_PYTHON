@@ -14,6 +14,7 @@
     <Teleport to="body">
       <div
         v-if="open"
+        ref="dropdownRef"
         :class="[
           'field-dropdown',
           'field-dropdown-floating',
@@ -61,6 +62,7 @@ const emit = defineEmits(["update:modelValue"]);
 const open = ref(false);
 const query = ref("");
 const shellRef = ref(null);
+const dropdownRef = ref(null);
 const dropdownDirection = ref("down");
 const dropdownStyle = ref({});
 const emptyOption = { value: "", label: props.emptyLabel };
@@ -135,6 +137,7 @@ function selectOption(option) {
 function bindFloatingListeners() {
   if (listenersBound) return;
   listenersBound = true;
+  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
   window.addEventListener("resize", updateDropdownPosition);
   window.addEventListener("scroll", updateDropdownPosition, true);
 }
@@ -142,8 +145,15 @@ function bindFloatingListeners() {
 function unbindFloatingListeners() {
   if (!listenersBound) return;
   listenersBound = false;
+  document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
   window.removeEventListener("resize", updateDropdownPosition);
   window.removeEventListener("scroll", updateDropdownPosition, true);
+}
+
+function handleDocumentPointerDown(event) {
+  const target = event.target;
+  if (shellRef.value?.contains(target) || dropdownRef.value?.contains(target)) return;
+  closeDropdown();
 }
 
 onBeforeUnmount(unbindFloatingListeners);

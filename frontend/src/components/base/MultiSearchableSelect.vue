@@ -10,10 +10,12 @@
         ref="inputRef"
         v-model="query"
         type="text"
+        autocomplete="off"
+        spellcheck="false"
         :placeholder="selectedOptions.length ? '' : placeholder"
         @focus="openDropdown"
         @input="openDropdown"
-        @keydown.escape="open = false"
+        @keydown.escape="closeDropdown"
       />
     </div>
     <div
@@ -34,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -49,6 +51,7 @@ const shellRef = ref(null);
 const open = ref(false);
 const query = ref("");
 const dropdownDirection = ref("down");
+let outsideListenerBound = false;
 
 const selectedValues = computed(() => new Set((props.modelValue || []).map((item) => String(item))));
 
@@ -75,6 +78,11 @@ watch(
   },
 );
 
+watch(open, (isOpen) => {
+  if (isOpen) bindOutsideListener();
+  else unbindOutsideListener();
+});
+
 function focusInput() {
   inputRef.value?.focus();
   openDropdown();
@@ -83,6 +91,10 @@ function focusInput() {
 function openDropdown() {
   open.value = true;
   void updateDropdownDirection();
+}
+
+function closeDropdown() {
+  open.value = false;
 }
 
 async function updateDropdownDirection() {
@@ -108,4 +120,23 @@ function removeOption(value) {
     (props.modelValue || []).filter((item) => String(item) !== String(value)),
   );
 }
+
+function bindOutsideListener() {
+  if (outsideListenerBound) return;
+  outsideListenerBound = true;
+  document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+}
+
+function unbindOutsideListener() {
+  if (!outsideListenerBound) return;
+  outsideListenerBound = false;
+  document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
+}
+
+function handleDocumentPointerDown(event) {
+  if (shellRef.value?.contains(event.target)) return;
+  closeDropdown();
+}
+
+onBeforeUnmount(unbindOutsideListener);
 </script>
