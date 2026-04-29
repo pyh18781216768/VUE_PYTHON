@@ -28,10 +28,12 @@
     <DashboardChartGrid :options="chartOptions" />
 
     <DashboardRecordTable
+      :can-load-more="canLoadMore"
       :columns="config.tableColumns"
       :rows="visibleRows"
       :sorts="sorts"
       :total="tableRows.length"
+      @load-more="loadMoreRows"
       @sort-change="toggleSort"
     />
 
@@ -64,6 +66,7 @@ const props = defineProps({
 
 const {
   chartOptions,
+  canLoadMore,
   config,
   dashboard,
   exporting,
@@ -81,6 +84,7 @@ const {
   visibleRows,
   exportExcel,
   loadDashboard,
+  loadMoreRows,
 } = useDashboardPage(toRef(props, "page"));
 
 const sourceColumns = [

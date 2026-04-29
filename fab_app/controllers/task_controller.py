@@ -19,6 +19,7 @@ from fab_app.services.task_system_service import (
     delete_user,
     get_attachment_file,
     get_reminders,
+    get_task_lookup_payload,
     get_task_system_payload,
     get_user_summary,
     get_system_settings,
@@ -79,6 +80,12 @@ def task_system_bootstrap():
 @login_required
 def task_users():
     return jsonify({"items": list_users()})
+
+
+@task_blueprint.get("/api/task-system/task-lookups")
+@login_required
+def task_lookups():
+    return jsonify(get_task_lookup_payload())
 
 
 @task_blueprint.post("/api/task-system/users")

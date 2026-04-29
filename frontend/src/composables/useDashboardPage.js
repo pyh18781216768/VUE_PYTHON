@@ -25,6 +25,7 @@ export function useDashboardPage(pageRef) {
   const exporting = ref(false);
   const message = ref("");
   const messageTone = ref("success");
+  const visibleLimit = ref(300);
   const filters = reactive({});
   const sorts = ref([{ key: "severityValue", direction: "desc" }]);
 
@@ -34,7 +35,8 @@ export function useDashboardPage(pageRef) {
   const tableRows = computed(() =>
     sortDashboardRows(createTableRows(filteredRecords.value, filters, dashboard.value.metricFormat), sorts.value),
   );
-  const visibleRows = computed(() => tableRows.value.slice(0, 300));
+  const visibleRows = computed(() => tableRows.value.slice(0, visibleLimit.value));
+  const canLoadMore = computed(() => visibleRows.value.length < tableRows.value.length);
   const metricCards = computed(() => createMetricCards(tableRows.value, dashboard.value));
   const trendRows = computed(() => createTrendRows(filteredRecords.value));
   const categoryRows = computed(() => createCategoryRows(tableRows.value));
@@ -54,6 +56,7 @@ export function useDashboardPage(pageRef) {
     for (const field of filterFields.value) {
       filters[field.key] = field.key === "snapshotDate" ? "latest" : "";
     }
+    visibleLimit.value = 300;
   }
 
   function showMessage(nextMessage, tone = "success") {
@@ -69,6 +72,7 @@ export function useDashboardPage(pageRef) {
 
   async function loadDashboard(refresh = false) {
     loading.value = true;
+    visibleLimit.value = 300;
     showMessage("");
     try {
       const params = new URLSearchParams({ page: activePage.value });
@@ -119,6 +123,11 @@ export function useDashboardPage(pageRef) {
       }
     }
     sorts.value = nextSorts.length ? nextSorts : [{ key: "severityValue", direction: "desc" }];
+    visibleLimit.value = 300;
+  }
+
+  function loadMoreRows() {
+    visibleLimit.value = Math.min(visibleLimit.value + 300, tableRows.value.length);
   }
 
   watch(
@@ -133,6 +142,7 @@ export function useDashboardPage(pageRef) {
 
   return {
     chartOptions,
+    canLoadMore,
     config,
     dashboard,
     exporting,
@@ -149,6 +159,7 @@ export function useDashboardPage(pageRef) {
     exportExcel,
     formatMetric: (value, format = dashboard.value.metricFormat) => formatDashboardMetric(value, format),
     loadDashboard,
+    loadMoreRows,
     resetFilters,
     toggleSort,
   };

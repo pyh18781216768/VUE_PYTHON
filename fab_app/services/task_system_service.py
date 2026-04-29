@@ -88,6 +88,15 @@ def get_task_system_payload(username: str) -> dict[str, Any]:
     }
 
 
+def get_task_lookup_payload() -> dict[str, Any]:
+    return {
+        "users": list_users(),
+        "handovers": list_handover_references(),
+        "statusOptions": list(TASK_STATUSES),
+        "priorityOptions": list(TASK_PRIORITIES),
+    }
+
+
 def list_users() -> list[dict[str, Any]]:
     return [_build_user_summary(row) for row in user_repository.fetch_all_users()]
 
@@ -483,6 +492,34 @@ def list_handover_records(filters: dict[str, Any]) -> list[dict[str, Any]]:
     return records
 
 
+def list_handover_references() -> list[dict[str, Any]]:
+    shifts = list_shift_groups()
+    shifts_by_id = {item["id"]: item for item in shifts}
+    floors_by_id = {item["id"]: item for item in list_floors()}
+    references = []
+    for row in task_repository.fetch_all_handover_records():
+        shift_group_id = _safe_int(row["shift_group_id"])
+        shift = shifts_by_id.get(shift_group_id, {})
+        receiver_shift = _get_next_shift(shift_group_id, shifts)
+        floor = floors_by_id.get(_safe_int(row["floor_id"]), {})
+        handover_user = _build_person_reference(row["handover_user"])
+        receiver_user = _build_person_reference(row["receiver_user"])
+        references.append(
+            {
+                "id": int(row["id"]),
+                "keywords": _normalize_text(row["keywords"]),
+                "shiftName": _normalize_text(shift.get("name")) or "--",
+                "receiverShiftName": _normalize_text(receiver_shift.get("name")) or "--",
+                "floorName": _normalize_text(floor.get("name")) or "--",
+                "handoverUser": handover_user["label"],
+                "receiverUser": receiver_user["label"],
+                "recordTime": _normalize_text(row["record_time"]),
+                "createdAt": _normalize_text(row["created_at"]),
+            }
+        )
+    return references
+
+
 def save_handover_record(
     payload: dict[str, Any],
     files,
@@ -561,11 +598,6 @@ def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None =
     submission_attachments_by_owner = _build_attachment_lookup("task_submission")
     latest_submission_by_task = _build_latest_task_submission_lookup()
     reviews_by_submission = _build_task_review_lookup()
-    handover_rows = handovers if handovers is not None else list_handover_records({})
-    handover_supervisors = {
-        item["id"]: item["receiverSupervisorLabel"]
-        for item in handover_rows
-    }
     keyword = _normalize_text(filters.get("keyword")).lower()
     status = _normalize_text(filters.get("status"))
     assignee_user = _normalize_text(filters.get("assigneeUser"))
@@ -581,7 +613,6 @@ def list_tasks(filters: dict[str, Any], handovers: list[dict[str, Any]] | None =
             reviews_by_submission,
             submission_attachments_by_owner,
         )
-        task["supervisorLabel"] = handover_supervisors.get(task["handoverRecordId"], "")
         if status and task["status"] != status:
             continue
         if assignee_user and not _matches_person_filter(task.get("assigneeUserId") or task["assigneeUser"], assignee_user):
@@ -1530,6 +1561,7 @@ def _build_task_summary(
     assignee_user = _build_person_reference(row["assignee_user"])
     creator_user = _build_person_reference(row["creator_user"])
     rejected_by = _build_person_reference(row["rejected_by"])
+    supervisor = _get_supervisor_for_person(assignee_user["username"] or row["assignee_user"])
     mention_users = _parse_mention_users(row["mention_users"])
     review_submission = _build_task_submission_summary(
         latest_submission,
@@ -1552,7 +1584,8 @@ def _build_task_summary(
         "creatorUserId": creator_user["username"],
         "creatorUser": creator_user["label"],
         "handoverRecordId": _safe_int(row["handover_record_id"]),
-        "supervisorLabel": "",
+        "supervisorUser": supervisor["username"],
+        "supervisorLabel": supervisor["label"],
         "createdAt": _normalize_text(row["created_at"]),
         "updatedAt": _normalize_text(row["updated_at"]),
         "completedAt": _normalize_text(row["completed_at"]),

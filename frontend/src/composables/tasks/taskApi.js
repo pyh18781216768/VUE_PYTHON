@@ -2,11 +2,11 @@ import { postDownload } from "@/api/download";
 import { requestFormData, requestJson } from "@/api/http";
 
 export async function loadTaskLookups() {
-  const [sessionPayload, bootstrapPayload] = await Promise.all([
+  const [sessionPayload, lookupPayload] = await Promise.all([
     requestJson("/api/session"),
-    requestJson("/api/task-system/bootstrap"),
+    requestJson("/api/task-system/task-lookups"),
   ]);
-  return { sessionPayload, bootstrapPayload };
+  return { lookupPayload, sessionPayload };
 }
 
 export async function fetchTaskRows(filters) {

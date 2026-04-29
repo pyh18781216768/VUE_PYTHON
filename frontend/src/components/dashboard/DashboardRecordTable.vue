@@ -13,15 +13,21 @@
       :sorts="sorts"
       @sort-change="(key, event) => $emit('sort-change', key, event)"
     />
+    <div v-if="canLoadMore" class="table-footer-actions">
+      <button class="ghost-button" type="button" @click="$emit('load-more')">
+        顯示更多
+      </button>
+    </div>
   </section>
 </template>
 
 <script setup>
 import DataTable from "@/components/DataTable.vue";
 
-defineEmits(["sort-change"]);
+defineEmits(["load-more", "sort-change"]);
 
 defineProps({
+  canLoadMore: { type: Boolean, default: false },
   columns: { type: Array, default: () => [] },
   rows: { type: Array, default: () => [] },
   sorts: { type: Array, default: () => [] },

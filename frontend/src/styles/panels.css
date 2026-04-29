@@ -62,6 +62,12 @@
   gap: 16px;
 }
 
+.table-footer-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+}
+
 .chart-card-badge {
   border-radius: 999px;
   padding: 5px 10px;

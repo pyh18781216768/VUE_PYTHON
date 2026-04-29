@@ -156,7 +156,7 @@ const sections = computed(() => {
         { label: "優先級", value: valueOrEmpty(task.priority) },
         { label: "負責人", value: valueOrEmpty(task.assigneeUser) },
         { label: "發布者", value: valueOrEmpty(task.creatorUser) },
-        { label: "主管", value: valueOrEmpty(task.supervisorLabel) },
+        { label: "責任人主管", value: valueOrEmpty(task.supervisorLabel) },
         { label: "@人員", value: valueOrEmpty(task.mentionUserLabels), long: true },
       ],
     },

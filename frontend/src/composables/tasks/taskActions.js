@@ -40,13 +40,26 @@ export function createTaskActions(context) {
     exporting,
   } = context;
 
+  let lookupPromise = null;
+  let lookupsLoaded = false;
+
   async function loadLookups() {
-    const { sessionPayload, bootstrapPayload } = await loadTaskLookups();
-    currentUser.value = sessionPayload.authenticated ? sessionPayload.user : null;
-    users.value = bootstrapPayload.users || [];
-    handovers.value = bootstrapPayload.handovers || [];
-    statusOptionsRaw.value = bootstrapPayload.statusOptions || DEFAULT_STATUS_OPTIONS;
-    priorityOptionsRaw.value = bootstrapPayload.priorityOptions || DEFAULT_PRIORITY_OPTIONS;
+    if (lookupsLoaded) return;
+    if (!lookupPromise) {
+      lookupPromise = loadTaskLookups()
+        .then(({ lookupPayload, sessionPayload }) => {
+          currentUser.value = sessionPayload.authenticated ? sessionPayload.user : null;
+          users.value = lookupPayload.users || [];
+          handovers.value = lookupPayload.handovers || [];
+          statusOptionsRaw.value = lookupPayload.statusOptions || DEFAULT_STATUS_OPTIONS;
+          priorityOptionsRaw.value = lookupPayload.priorityOptions || DEFAULT_PRIORITY_OPTIONS;
+          lookupsLoaded = true;
+        })
+        .finally(() => {
+          lookupPromise = null;
+        });
+    }
+    await lookupPromise;
   }
 
   async function loadTasks() {
