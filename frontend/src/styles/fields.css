@@ -19,6 +19,12 @@
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
 }
 
+.field-dropdown-floating {
+  position: fixed;
+  z-index: 5200;
+  inset-inline: auto;
+}
+
 .field-dropdown-down {
   top: calc(100% + 6px);
 }

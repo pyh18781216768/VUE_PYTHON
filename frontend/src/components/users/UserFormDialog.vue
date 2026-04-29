@@ -44,12 +44,12 @@
         class="search-field"
         label="部門"
         :options="departmentOptions"
-        empty-label="請選擇"
-        placeholder="選擇或搜尋部門"
+        empty-label="不選擇部門"
+        placeholder=""
       />
       <label>
         <span>密碼</span>
-        <input v-model="form.password" type="password" placeholder="新建必填，編輯留空不改" />
+        <input v-model="form.password" type="password" autocomplete="new-password" placeholder="新建必填，編輯留空不改" />
       </label>
       <p v-if="message" :class="['inline-message form-span-all', messageTone === 'success' ? 'inline-success' : 'inline-error']">
         {{ message }}

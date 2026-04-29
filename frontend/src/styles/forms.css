@@ -46,6 +46,7 @@
   flex: 1;
 }
 
+.field-shell input,
 .search-field input,
 .settings-form input,
 .settings-form textarea {
@@ -59,7 +60,40 @@
   outline: none;
 }
 
+.field-shell input:-webkit-autofill,
+.search-field input:-webkit-autofill,
+.settings-form input:-webkit-autofill {
+  box-shadow: 0 0 0 1000px rgba(4, 18, 31, 0.96) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(4, 18, 31, 0.96) inset;
+  -webkit-text-fill-color: #e8f7ff;
+  caret-color: #e8f7ff;
+}
+
+.field-shell input::placeholder,
+.search-field input::placeholder,
+.settings-form input::placeholder,
+.settings-form textarea::placeholder {
+  color: #7895a8;
+}
+
+.field-shell input:-internal-autofill-selected,
+.search-field input:-internal-autofill-selected,
+.settings-form input:-internal-autofill-selected {
+  background: rgba(4, 18, 31, 0.96) !important;
+  color: #e8f7ff !important;
+}
+
+.field-shell input {
+  width: 100%;
+}
+
+.field-shell,
+.settings-form label {
+  min-width: 0;
+}
+
 .search-field input:focus,
+.field-shell input:focus,
 .settings-form input:focus,
 .settings-form textarea:focus {
   border-color: rgba(60, 231, 232, 0.74);
