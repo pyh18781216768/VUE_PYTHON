@@ -41,7 +41,7 @@
   display: flex;
   align-items: center;
   gap: 24px;
-  padding: 0 clamp(300px, 29vw, 430px) 0 12px;
+  padding: 0 clamp(520px, 37vw, 650px) 0 12px;
   border-bottom: 1px solid rgba(38, 181, 255, 0.46);
   background:
     linear-gradient(90deg, rgba(4, 18, 36, 0.88), rgba(6, 25, 48, 0.58)),
@@ -720,7 +720,7 @@
   .manufacturing-header {
     align-items: flex-start;
     flex-direction: column;
-    padding: 18px 280px 18px 18px;
+    padding: 18px 500px 18px 18px;
     clip-path: none;
   }
 

@@ -25,6 +25,10 @@
     gap: 8px;
   }
 
+  .top-time-display {
+    display: none;
+  }
+
   .top-tool-button {
     padding: 0 11px;
   }

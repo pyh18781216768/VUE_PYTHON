@@ -18,6 +18,7 @@ a {
 }
 
 .frontend-shell {
+  position: relative;
   min-height: 100vh;
   display: block;
 }
@@ -29,10 +30,10 @@ a {
 }
 
 .frontend-top-tools {
-  position: fixed;
+  position: absolute;
   top: 22px;
   right: 24px;
-  z-index: 3600;
+  z-index: 2600;
   display: inline-flex;
   align-items: center;
   gap: 10px;

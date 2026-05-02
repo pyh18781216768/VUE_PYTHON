@@ -55,7 +55,7 @@
               {{ status.name }} {{ formatNumber(status.value) }} 件
             </span>
           </div>
-          <ManufacturingChart :option="taskAnalysisOption" />
+          <ManufacturingChart :option="taskAnalysisOption" @chart-click="openTasksByStatus" />
         </div>
       </article>
 
@@ -135,6 +135,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import ManufacturingChart from "@/components/dashboard/ManufacturingChart.vue";
 import ManufacturingPanelHeading from "@/components/dashboard/ManufacturingPanelHeading.vue";
 import {
@@ -147,6 +148,7 @@ import {
 
 const chartText = "#c7e9ff";
 const chartGrid = "rgba(76, 196, 255, 0.12)";
+const router = useRouter();
 const taskStatusColorMap = {
   未开始: "#22d3ee",
   未開始: "#22d3ee",
@@ -186,6 +188,13 @@ const taskStatusItems = computed(() => {
   const items = taskSummary.value.statusItems || [];
   return items.filter((item) => Number(item.value || 0) > 0);
 });
+
+const taskStatusQueryMap = {
+  未開始: "未开始",
+  進行中: "进行中",
+  待審核: "待审核",
+  已駁回: "已驳回",
+};
 
 const trends = computed(() => [
   createParameterTrendRow("OC 達標率", ocSummary.value),
@@ -242,7 +251,10 @@ const taskAnalysisOption = computed(() => {
       radius: ["48%", "70%"],
       center: ["38%", "52%"],
       label: { show: false },
-      data: chartItems,
+      data: chartItems.map((item) => ({
+        ...item,
+        taskStatus: normalizeTaskStatus(item.name),
+      })),
     },
   ],
   graphic: {
@@ -322,6 +334,20 @@ const taskProgressOption = computed(() => {
 function shortDate(value) {
   const text = String(value || "");
   return text.length >= 10 ? text.slice(5, 10) : text || "--";
+}
+
+function openTasksByStatus(params) {
+  const status = normalizeTaskStatus(params?.data?.taskStatus || params?.name);
+  if (!status || status === "暫無任務") return;
+  router.push({
+    path: "/frontend/tasks",
+    query: { status },
+  });
+}
+
+function normalizeTaskStatus(status) {
+  const text = String(status || "").trim();
+  return taskStatusQueryMap[text] || text;
 }
 
 function createParameterTrendRow(name, summary) {

@@ -25,13 +25,21 @@ const props = defineProps({
   option: { type: Object, default: () => ({}) },
 });
 
+const emit = defineEmits(["chart-click"]);
+
 const chartRef = ref(null);
 let chart = null;
+
+function handleChartClick(params) {
+  emit("chart-click", params);
+}
 
 function renderChart() {
   if (!chartRef.value) return;
   if (!chart) chart = init(chartRef.value);
   chart.setOption(props.option || {}, true);
+  chart.off("click", handleChartClick);
+  chart.on("click", handleChartClick);
 }
 
 function resizeChart() {
@@ -55,6 +63,7 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", resizeChart);
+  chart?.off("click", handleChartClick);
   chart?.dispose();
   chart = null;
 });

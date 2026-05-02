@@ -9,7 +9,7 @@
       :key="item.to"
       :class="{ 'router-link-active': isActive(item.to) }"
       :href="item.to"
-      @click.prevent="navigateTo(item.to)"
+      @click="navigateTo($event, item.to)"
     >
       <span>{{ item.kicker }}</span>
       <strong>{{ item.label }}</strong>
@@ -29,12 +29,21 @@ defineProps({
 
 const route = useRoute();
 const router = useRouter();
+const directNavigationPaths = new Set(["/oc", "/angle", "/lens"]);
 
 function isActive(path) {
   return route.path === path;
 }
 
-async function navigateTo(path) {
+async function navigateTo(event, path) {
+  if (directNavigationPaths.has(path)) {
+    event.preventDefault();
+    emit("navigate");
+    if (route.path !== path) window.location.assign(path);
+    return;
+  }
+
+  event.preventDefault();
   try {
     await router.push(path);
     if (router.currentRoute.value.path !== path) {

@@ -1,5 +1,11 @@
 <template>
   <div v-if="authenticated" class="frontend-top-tools">
+    <div class="top-time-display" aria-label="系統時間">
+      <i aria-hidden="true"></i>
+      <span>{{ currentDateText }}</span>
+      <strong>{{ currentClockText }}</strong>
+    </div>
+
     <div class="notification-anchor">
       <NotificationTrigger :active="panelOpen" :unread-count="unreadCount" @toggle="togglePanel" />
       <NotificationPanel
@@ -51,7 +57,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { requestJson } from "@/api/http";
 import {
@@ -66,6 +72,8 @@ import NotificationProfileDialog from "./NotificationProfileDialog.vue";
 import NotificationTrigger from "./NotificationTrigger.vue";
 
 const profileOpen = ref(false);
+const now = ref(new Date());
+let clockTimer = null;
 
 const {
   actionMessage,
@@ -105,6 +113,24 @@ const {
   unreadCount,
 } = useNotifications();
 
+const currentDateText = computed(() =>
+  new Intl.DateTimeFormat("zh-Hant-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).format(now.value),
+);
+
+const currentClockText = computed(() =>
+  new Intl.DateTimeFormat("zh-Hant-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now.value),
+);
+
 function handleProfileSaved(user) {
   updateCurrentUser(user);
   setAuthenticatedSession(user);
@@ -125,8 +151,15 @@ function handleLoginWindowConflict() {
 }
 
 onMounted(async () => {
+  clockTimer = window.setInterval(() => {
+    now.value = new Date();
+  }, 1000);
   await loadNotifications().catch(() => {});
   startAutoRefresh();
+});
+
+onUnmounted(() => {
+  if (clockTimer) window.clearInterval(clockTimer);
 });
 
 watch(

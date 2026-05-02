@@ -112,7 +112,8 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 
 import AttachmentPreviewDialog from "@/components/handover/AttachmentPreviewDialog.vue";
 import TaskDetailDialog from "@/components/tasks/TaskDetailDialog.vue";
@@ -191,6 +192,8 @@ const {
   userOptions,
 } = useTasks();
 
+const route = useRoute();
+
 const columns = [
   { key: "id", label: "ID", sortable: true },
   { key: "title", label: "標題", sortable: true },
@@ -204,5 +207,32 @@ const columns = [
   { key: "actions", label: "操作" },
 ];
 
-onMounted(loadTasks);
+onMounted(() => {
+  applyRouteFilters();
+  loadTasks();
+});
+
+watch(
+  () => route.query.status,
+  () => {
+    applyRouteFilters();
+    loadTasks();
+  },
+);
+
+function applyRouteFilters() {
+  filters.status = normalizeTaskStatusQuery(route.query.status);
+}
+
+function normalizeTaskStatusQuery(value) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const text = String(rawValue || "").trim();
+  const statusMap = {
+    未開始: "未开始",
+    進行中: "进行中",
+    待審核: "待审核",
+    已駁回: "已驳回",
+  };
+  return statusMap[text] || text;
+}
 </script>
