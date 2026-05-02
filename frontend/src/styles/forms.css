@@ -52,12 +52,14 @@
 .settings-form textarea {
   min-height: 44px;
   box-sizing: border-box;
-  border: 1px solid rgba(51, 220, 229, 0.22);
-  border-radius: 14px;
+  border: 1px solid rgba(67, 189, 255, 0.32);
+  border-radius: 6px;
   padding: 0 14px;
-  background: rgba(4, 18, 31, 0.84);
+  background:
+    linear-gradient(180deg, rgba(7, 31, 59, 0.9), rgba(3, 16, 31, 0.94));
   color: #e8f7ff;
   outline: none;
+  box-shadow: inset 0 0 16px rgba(28, 136, 255, 0.08);
 }
 
 .field-shell input:-webkit-autofill,
@@ -96,8 +98,10 @@
 .field-shell input:focus,
 .settings-form input:focus,
 .settings-form textarea:focus {
-  border-color: rgba(60, 231, 232, 0.74);
-  box-shadow: 0 0 0 3px rgba(60, 231, 232, 0.11);
+  border-color: rgba(74, 205, 255, 0.78);
+  box-shadow:
+    inset 0 0 18px rgba(28, 136, 255, 0.12),
+    0 0 0 3px rgba(38, 161, 255, 0.14);
 }
 
 .settings-form textarea {
@@ -202,13 +206,15 @@
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid rgba(51, 220, 229, 0.28);
-  border-radius: 28px;
+  border: 1px solid rgba(0, 183, 255, 0.58);
+  border-radius: 10px;
   padding: 26px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(48, 218, 220, 0.16), transparent 18rem),
-    rgba(5, 19, 33, 0.98);
-  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.48);
+    radial-gradient(circle at 100% 0%, rgba(24, 132, 255, 0.2), transparent 18rem),
+    linear-gradient(180deg, rgba(8, 31, 61, 0.98), rgba(3, 16, 31, 0.98));
+  box-shadow:
+    inset 0 0 28px rgba(8, 148, 255, 0.12),
+    0 26px 90px rgba(0, 0, 0, 0.5);
 }
 
 @media (max-height: 780px) {

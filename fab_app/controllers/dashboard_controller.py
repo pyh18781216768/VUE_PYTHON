@@ -6,6 +6,7 @@ from fab_app.controllers.auth_controller import current_username, login_required
 from fab_app.core.database import get_database_path
 from fab_app.services.dashboard_service import get_dashboard_data, get_supported_pages
 from fab_app.services.export_service import export_excel_file
+from fab_app.services.home_dashboard_service import get_home_dashboard_data
 from fab_app.services.task_system_service import record_operation
 
 
@@ -22,6 +23,13 @@ def dashboard():
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
     return jsonify(payload)
+
+
+@dashboard_blueprint.get("/api/home-dashboard")
+@login_required
+def home_dashboard():
+    refresh = request.args.get("refresh") == "1"
+    return jsonify(get_home_dashboard_data(refresh=refresh))
 
 
 @dashboard_blueprint.post("/api/export-excel")

@@ -31,6 +31,7 @@ const selectedSystem = ref(getSystemFromPath(window.location.pathname));
 const navItems = computed(() => {
   if (selectedSystem.value === "dashboard") {
     return [
+      { kicker: "HOME", label: "首頁", to: "/" },
       { kicker: "OC", label: "OC 參數", to: "/oc" },
       { kicker: "ANGLE", label: "Angle 參數", to: "/angle" },
       { kicker: "LENS", label: "Lens 參數", to: "/lens" },
@@ -62,7 +63,7 @@ const userInfo = computed(() => {
 });
 
 function getSystemFromPath(path) {
-  return ["/oc", "/angle", "/lens", "/frontend/dashboard"].includes(path) ? "dashboard" : "tasks";
+  return ["/", "/oc", "/angle", "/lens", "/frontend/dashboard"].includes(path) ? "dashboard" : "tasks";
 }
 
 function openDrawer() {

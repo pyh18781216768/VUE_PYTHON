@@ -25,7 +25,7 @@ a {
 .frontend-main {
   width: min(1480px, calc(100vw - 48px));
   margin: 0 auto;
-  padding: 88px 0 52px;
+  padding: 24px 0 52px;
 }
 
 .frontend-top-tools {

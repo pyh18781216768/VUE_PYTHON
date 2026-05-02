@@ -1,8 +1,10 @@
 .data-table-wrap {
   overflow: auto;
   margin-top: 18px;
-  border: 1px solid rgba(57, 201, 218, 0.16);
-  border-radius: 18px;
+  border: 1px solid rgba(67, 189, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(4, 18, 34, 0.36);
+  box-shadow: inset 0 0 20px rgba(28, 136, 255, 0.06);
 }
 
 .data-table {
@@ -14,23 +16,24 @@
 .data-table th,
 .data-table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(61, 175, 197, 0.14);
+  border-bottom: 1px solid rgba(76, 165, 235, 0.16);
   text-align: left;
   white-space: nowrap;
 }
 
 .data-table th {
-  color: #cdefff;
+  background: linear-gradient(180deg, rgba(17, 55, 96, 0.76), rgba(8, 31, 61, 0.58));
+  color: #d9f3ff;
   font-size: 13px;
   letter-spacing: 0.04em;
 }
 
 .data-table td {
-  color: #b8ccdb;
+  color: #bfd7e8;
 }
 
 .data-table tbody tr:hover td {
-  background: rgba(49, 211, 224, 0.06);
+  background: rgba(31, 128, 224, 0.12);
 }
 
 .data-table-empty {
@@ -52,17 +55,17 @@
 }
 
 .data-table-sort:hover {
-  color: #56f0ee;
+  color: #67d8ff;
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
-  border: 1px solid rgba(76, 222, 225, 0.24);
+  border: 1px solid rgba(67, 189, 255, 0.36);
   border-radius: 999px;
   padding: 0 10px;
-  background: rgba(45, 208, 211, 0.1);
-  color: #aaf8f2;
+  background: rgba(22, 99, 181, 0.18);
+  color: #bdeaff;
   font-weight: 800;
 }

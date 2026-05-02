@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import Handover from "@/views/Handover.vue";
 import Login from "@/views/Login.vue";
+import ManufacturingHome from "@/views/ManufacturingHome.vue";
 import Operations from "@/views/Operations.vue";
 import Settings from "@/views/Settings.vue";
 import Tasks from "@/views/Tasks.vue";
@@ -10,13 +11,14 @@ import { requestJson } from "@/api/http";
 
 const standaloneMeta = { standalone: true };
 const authMeta = { requiresAuth: true };
+const dashboardHomeMeta = { requiresAuth: true, dashboardHome: true };
 const adminMeta = { requiresAuth: true, requiresAdmin: true };
 const DashboardParameter = () => import("@/views/DashboardParameter.vue");
 
 const routes = [
-  { path: "/", redirect: "/task-system/handover" },
-  { path: "/frontend", redirect: "/oc" },
-  { path: "/frontend/dashboard", redirect: "/oc" },
+  { path: "/", name: "home", component: ManufacturingHome, meta: dashboardHomeMeta },
+  { path: "/frontend", redirect: "/" },
+  { path: "/frontend/dashboard", redirect: "/" },
   { path: "/frontend/handover", name: "frontend-handover", component: Handover, meta: authMeta },
   { path: "/frontend/tasks", name: "frontend-tasks", component: Tasks, meta: authMeta },
   { path: "/frontend/users", name: "frontend-users", component: Users, meta: adminMeta },
@@ -60,7 +62,7 @@ router.beforeEach(async (to) => {
     return { path: "/login", query: { redirect: to.fullPath } };
   }
   if (to.meta.requiresAdmin && Number(session.user?.permissionLevel || 1) < 5) {
-    return { path: "/task-system/handover" };
+    return { path: "/" };
   }
   return true;
 });

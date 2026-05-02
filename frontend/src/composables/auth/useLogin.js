@@ -9,7 +9,7 @@ import {
   startActiveLoginWindowHeartbeat,
 } from "./loginWindowRegistry";
 
-const DEFAULT_REDIRECT = "/task-system/handover";
+const DEFAULT_REDIRECT = "/";
 
 function normalizeUsername(username) {
   return String(username || "").trim().toLowerCase();
